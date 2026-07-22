@@ -165,6 +165,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def fix_vercel_path(request, call_next):
+    path = request.scope.get("path", "")
+    if path.startswith("/api/index.py"):
+        new_path = path.replace("/api/index.py", "") or "/"
+        request.scope["path"] = new_path
+    elif path.startswith("/api/") and not path.startswith("/api/ingredients"):
+        new_path = path[4:] or "/"
+        request.scope["path"] = new_path
+    return await call_next(request)
+
 INGREDIENT_EXPANSIONS = {
     "paneer": ["paneer", "cottage cheese", "indian cottage cheese", "chenna"],
     "panner": ["paneer", "cottage cheese", "indian cottage cheese", "chenna"],
@@ -447,7 +458,10 @@ def recommend_similar_items(recipe_id: int, candidates: List[dict], top_n: int =
 
 # --- ENDPOINTS ---
 
+# --- ENDPOINTS ---
+
 @app.get("/")
+@app.get("/api")
 def get_root():
     ensure_state_loaded()
     return {
@@ -459,6 +473,7 @@ def get_root():
     }
 
 @app.get("/recipes")
+@app.get("/api/recipes")
 def get_recipes(
     page: int = 1,
     limit: int = 12,
@@ -517,6 +532,7 @@ def get_recipes(
     }
 
 @app.get("/recipe/{recipe_id}")
+@app.get("/api/recipe/{recipe_id}")
 def get_recipe_by_id(recipe_id: int):
     ensure_state_loaded()
     recipe_data = state.recipes_by_id.get(recipe_id)
@@ -528,6 +544,7 @@ def get_recipe_by_id(recipe_id: int):
     return res
 
 @app.post("/search")
+@app.post("/api/search")
 def search_recipes(payload: SearchRequest):
     ensure_state_loaded()
     if not payload.query or not payload.query.strip():
@@ -555,6 +572,7 @@ def search_recipes(payload: SearchRequest):
     }
 
 @app.post("/recommend")
+@app.post("/api/recommend")
 def recommend_recipes(payload: RecommendRequest):
     ensure_state_loaded()
     candidates = filter_candidates(
@@ -583,6 +601,7 @@ def recommend_recipes(payload: RecommendRequest):
     }
 
 @app.get("/cuisines")
+@app.get("/api/cuisines")
 def get_cuisines():
     ensure_state_loaded()
     counts = {}
@@ -593,6 +612,7 @@ def get_cuisines():
     return {"cuisines": cuisines_list}
 
 @app.get("/meal-types")
+@app.get("/api/meal-types")
 def get_meal_types():
     ensure_state_loaded()
     counts = {}
@@ -603,6 +623,7 @@ def get_meal_types():
     return {"meal_types": meal_types_list}
 
 @app.get("/ingredients/autocomplete")
+@app.get("/api/ingredients/autocomplete")
 def autocomplete_ingredients(q: str = Query("", min_length=1)):
     ensure_state_loaded()
     if not q or not q.strip():
