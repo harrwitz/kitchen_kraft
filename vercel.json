@@ -1,0 +1,14 @@
+{
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/dist",
+  "rewrites": [
+    {
+      "source": "/(recipes|recipe/.*|search|recommend|cuisines|meal-types|ingredients/.*)",
+      "destination": "backend/main.py"
+    },
+    {
+      "source": "/((?!assets/.*|.*\\.js|.*\\.css|.*\\.png|.*\\.jpg|.*\\.svg|.*\\.ico).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
