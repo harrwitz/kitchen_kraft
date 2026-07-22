@@ -1,85 +1,136 @@
 import os
+import csv
 import json
 import difflib
-import pandas as pd
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
-from preprocess import clean_text
-from recommender import TFIDFRecommender
-from utils import filter_recipes_dataframe, format_recipe_dict
+from preprocess import clean_text, check_vegetarian, check_vegan
+from utils import calculate_recipe_budget, get_smart_food_image
 
 CSV_PATH = os.path.join(os.path.dirname(__file__), "recipes.csv")
 UNIQUE_INGREDIENTS_PATH = os.path.join(os.path.dirname(__file__), "unique_ingredients.json")
 
-# In-Memory Global State Container
 class AppState:
-    df: Optional[pd.DataFrame] = None
-    recommender: Optional[TFIDFRecommender] = None
+    recipes: List[dict] = []
+    recipes_by_id: dict = {}
     unique_ingredients: List[dict] = []
+    is_loaded: bool = False
 
 state = AppState()
 
 def ensure_state_loaded():
     """
-    Ensures dataset, recommender, and unique ingredients are loaded into memory.
-    Safe for both serverless cold starts and Uvicorn server startup.
+    Fast, lightweight, zero-heavy-dependency state loader.
+    Loads recipes and unique ingredients instantly in < 0.2s.
     """
-    if state.df is not None:
+    if state.is_loaded:
         return
 
-    print("Initializing AI Recipe Builder Backend...")
+    print("Initializing AI Recipe Builder Backend (Lightweight Serverless Engine)...")
     if not os.path.exists(CSV_PATH):
-        raise RuntimeError(f"Permanent dataset missing at {CSV_PATH}. Run prepare_dataset.py first!")
+        raise RuntimeError(f"Permanent dataset missing at {CSV_PATH}.")
 
-    print(f"Loading {CSV_PATH} into pandas DataFrame...")
-    df = pd.read_csv(CSV_PATH)
-    
-    # Fill missing values
-    df['Recipe Name'] = df['Recipe Name'].fillna('Untitled Recipe')
-    df['Ingredients'] = df['Ingredients'].fillna('')
-    df['Instructions'] = df['Instructions'].fillna('')
-    df['Cuisine'] = df['Cuisine'].fillna('American')
-    df['Meal Type'] = df['Meal Type'].fillna('Dinner')
-    df['Prep Time'] = df['Prep Time'].fillna(15).astype(int)
-    df['Cook Time'] = df['Cook Time'].fillna(30).astype(int)
-    df['Calories'] = df['Calories'].fillna(400).astype(int)
-    df['Protein'] = df['Protein'].fillna(20).astype(int)
-    df['Carbs'] = df['Carbs'].fillna(40).astype(int)
-    df['Fat'] = df['Fat'].fillna(15).astype(int)
-    df['Difficulty'] = df['Difficulty'].fillna('Medium')
-    df['Servings'] = df['Servings'].fillna(4).astype(int)
-    df['Image URL'] = df['Image URL'].fillna('')
+    loaded_recipes = []
+    loaded_by_id = {}
 
-    state.df = df
-    print(f"Loaded {len(df)} recipes into RAM.")
+    with open(CSV_PATH, 'r', encoding='utf-8', errors='ignore') as f:
+        reader = csv.DictReader(f)
+        for idx, row in enumerate(reader):
+            title = (row.get('Recipe Name') or 'Untitled Recipe').strip()
+            ing_text = (row.get('Ingredients') or '').strip()
+            instructions = (row.get('Instructions') or '').strip()
+            cuisine = (row.get('Cuisine') or 'American').strip()
+            meal_type = (row.get('Meal Type') or 'Dinner').strip()
 
-    # Train or load TF-IDF model
-    recommender = TFIDFRecommender()
-    recommender.load_or_train(df)
-    state.recommender = recommender
+            if ing_text.startswith('[') and ing_text.endswith(']'):
+                try:
+                    import ast
+                    ing_parsed = ast.literal_eval(ing_text)
+                    ingredients_list = [i.strip() for i in ing_parsed if i.strip()]
+                except Exception:
+                    ingredients_list = [i.strip() for i in ing_text.split(',') if i.strip()]
+            else:
+                ingredients_list = [i.strip() for i in ing_text.split(',') if i.strip()]
 
-    # Load unique ingredients list if available
+            try: prep_time = int(row.get('Prep Time') or 15)
+            except ValueError: prep_time = 15
+
+            try: cook_time = int(row.get('Cook Time') or 30)
+            except ValueError: cook_time = 30
+
+            try: calories = int(row.get('Calories') or 400)
+            except ValueError: calories = 400
+
+            try: protein = int(row.get('Protein') or 20)
+            except ValueError: protein = 20
+
+            try: carbs = int(row.get('Carbs') or 40)
+            except ValueError: carbs = 40
+
+            try: fat = int(row.get('Fat') or 15)
+            except ValueError: fat = 15
+
+            try: servings = int(row.get('Servings') or 4)
+            except ValueError: servings = 4
+
+            difficulty = (row.get('Difficulty') or 'Medium').strip()
+
+            is_veg = check_vegetarian(ing_text, title)
+            is_vgn = check_vegan(ing_text, title)
+            budget_info = calculate_recipe_budget(row)
+            smart_image = get_smart_food_image(title, ing_text, cuisine, meal_type, is_veg)
+
+            item = {
+                "id": idx,
+                "recipe_name": title,
+                "ingredients": ingredients_list,
+                "raw_ingredients": ing_text,
+                "instructions": instructions,
+                "cuisine": cuisine,
+                "meal_type": meal_type,
+                "prep_time": prep_time,
+                "cook_time": cook_time,
+                "total_time": prep_time + cook_time,
+                "calories": calories,
+                "protein": protein,
+                "carbs": carbs,
+                "fat": fat,
+                "difficulty": difficulty,
+                "servings": servings,
+                "image_url": smart_image,
+                "is_vegetarian": is_veg,
+                "is_vegan": is_vgn,
+                "is_budget": budget_info["is_budget"],
+                "budget_tier": budget_info["budget_tier"],
+                "budget_symbol": budget_info["budget_symbol"],
+                "cost_per_serving": budget_info["cost_per_serving"],
+                "total_batch_cost": budget_info["total_batch_cost"]
+            }
+            loaded_recipes.append(item)
+            loaded_by_id[idx] = item
+
+    state.recipes = loaded_recipes
+    state.recipes_by_id = loaded_by_id
+
     if os.path.exists(UNIQUE_INGREDIENTS_PATH):
         try:
             with open(UNIQUE_INGREDIENTS_PATH, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 state.unique_ingredients = data.get("ingredients", [])
-                print(f"Loaded {len(state.unique_ingredients)} unique ingredient suggestions for autocomplete.")
         except Exception as e:
             print(f"Warning loading unique_ingredients.json: {e}")
 
-    print("Backend initialization complete! Ready to accept requests.")
+    state.is_loaded = True
+    print(f"Loaded {len(state.recipes)} recipes into RAM.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan context manager for ASGI servers."""
     ensure_state_loaded()
     yield
-    print("Shutting down AI Recipe Builder Backend...")
 
 app = FastAPI(
     title="AI Recipe Builder API",
@@ -88,7 +139,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Enable CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -97,134 +147,98 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- PYDANTIC SCHEMAS ---
-
 INGREDIENT_EXPANSIONS = {
-    # Hindi & Indian Synonyms with common typos & variants
     "paneer": ["paneer", "cottage cheese", "indian cottage cheese", "chenna"],
     "panner": ["paneer", "cottage cheese", "indian cottage cheese", "chenna"],
     "paner": ["paneer", "cottage cheese", "indian cottage cheese", "chenna"],
     "panneer": ["paneer", "cottage cheese", "indian cottage cheese", "chenna"],
     "panir": ["paneer", "cottage cheese", "indian cottage cheese", "chenna"],
     "cottage cheese": ["cottage cheese", "paneer", "indian cottage cheese", "chenna"],
-
     "haldi": ["haldi", "turmeric", "ground turmeric", "turmeric powder"],
     "haldii": ["haldi", "turmeric", "ground turmeric", "turmeric powder"],
     "turmeric": ["turmeric", "haldi", "ground turmeric", "turmeric powder"],
-
     "jeera": ["jeera", "zeera", "jira", "zira", "geera", "cumin", "cumin seeds", "ground cumin"],
     "zeera": ["zeera", "jeera", "cumin", "cumin seeds", "ground cumin"],
     "jira": ["jira", "jeera", "cumin", "cumin seeds", "ground cumin"],
     "zira": ["zira", "jeera", "cumin", "cumin seeds"],
     "cumin": ["cumin", "jeera", "zeera", "cumin seeds", "ground cumin"],
-
     "dhania": ["dhania", "dhaniya", "coriander", "coriander powder", "coriander seeds", "cilantro"],
     "dhaniya": ["dhaniya", "dhania", "coriander", "coriander powder", "coriander seeds", "cilantro"],
     "coriander": ["coriander", "dhania", "dhaniya", "cilantro", "coriander powder"],
     "cilantro": ["cilantro", "coriander", "dhania", "fresh coriander"],
-
     "adrak": ["adrak", "adrakh", "ginger", "fresh ginger", "ginger paste"],
     "adrakh": ["adrakh", "adrak", "ginger", "fresh ginger", "ginger paste"],
     "ginger": ["ginger", "adrak", "fresh ginger", "ginger paste"],
-
     "lehsun": ["lehsun", "lahsun", "lehson", "lesun", "garlic", "garlic cloves", "minced garlic"],
     "lahsun": ["lahsun", "lehsun", "garlic", "garlic cloves", "minced garlic"],
     "garlic": ["garlic", "lehsun", "lahsun", "garlic cloves", "minced garlic"],
-
     "pyaaz": ["pyaaz", "pyaz", "piaz", "kanda", "onion", "onions", "yellow onion", "red onion"],
     "pyaz": ["pyaz", "pyaaz", "piaz", "kanda", "onion", "onions", "yellow onion", "red onion"],
     "kanda": ["kanda", "pyaz", "pyaaz", "onion", "onions"],
     "onion": ["onion", "onions", "pyaz", "pyaaz", "kanda", "yellow onion", "red onion", "shallots"],
-
     "aloo": ["aloo", "alu", "allu", "potato", "potatoes", "russet potato", "sweet potato"],
     "alu": ["alu", "aloo", "potato", "potatoes"],
     "potato": ["potato", "potatoes", "aloo", "alu", "russet potato", "sweet potato"],
-
     "tamatar": ["tamatar", "tomato", "tomatoes", "diced tomatoes", "tomato paste"],
     "tomato": ["tomato", "tomatoes", "tamatar", "cherry tomatoes", "tomato paste", "roma tomatoes"],
-
     "palak": ["palak", "spinach", "fresh spinach", "baby spinach"],
     "spinach": ["spinach", "palak", "fresh spinach", "baby spinach"],
-
     "methi": ["methi", "fenugreek", "fenugreek leaves"],
     "fenugreek": ["fenugreek", "methi", "fenugreek leaves"],
-
     "dal": ["dal", "daal", "dhal", "lentils", "yellow lentils", "red lentils", "chana dal", "urad dal", "toor dal", "moong dal"],
     "daal": ["daal", "dal", "lentils", "yellow lentils", "red lentils"],
     "lentils": ["lentils", "dal", "daal", "yellow lentils", "red lentils"],
-
     "chana": ["chana", "chole", "chickpeas", "garbanzo beans", "kabuli chana"],
     "chole": ["chole", "chana", "chickpeas", "garbanzo beans"],
     "chickpeas": ["chickpeas", "chana", "chole", "garbanzo beans", "kabuli chana"],
-
     "rajma": ["rajma", "kidney beans", "red kidney beans"],
     "kidney beans": ["kidney beans", "rajma", "red kidney beans"],
-
     "atta": ["atta", "maida", "flour", "wheat flour", "whole wheat flour", "all-purpose flour"],
     "maida": ["maida", "atta", "flour", "all-purpose flour"],
     "flour": ["flour", "atta", "maida", "all-purpose flour", "whole wheat flour"],
-
     "dahi": ["dahi", "curd", "yogurt", "greek yogurt", "plain yogurt"],
     "curd": ["curd", "dahi", "yogurt"],
     "yogurt": ["yogurt", "dahi", "curd", "greek yogurt"],
-
     "ghee": ["ghee", "clarified butter", "butter"],
     "butter": ["butter", "ghee", "clarified butter"],
-
     "sarson": ["sarson", "rai", "mustard", "mustard seeds", "mustard oil"],
     "rai": ["rai", "sarson", "mustard", "mustard seeds"],
     "mustard": ["mustard", "sarson", "rai", "mustard seeds", "mustard oil"],
-
     "hing": ["hing", "asafoetida"],
     "asafoetida": ["asafoetida", "hing"],
-
     "elaichi": ["elaichi", "cardamom", "green cardamom"],
     "cardamom": ["cardamom", "elaichi", "green cardamom"],
-
     "laung": ["laung", "lavang", "cloves", "whole cloves"],
     "cloves": ["cloves", "laung", "lavang", "whole cloves"],
-
     "dalchini": ["dalchini", "cinnamon", "cinnamon stick", "ground cinnamon"],
     "cinnamon": ["cinnamon", "dalchini", "ground cinnamon"],
-
     "pudina": ["pudina", "mint", "fresh mint"],
     "mint": ["mint", "pudina", "fresh mint"],
-
     "hari mirch": ["hari mirch", "green chili", "green chilies", "green chili pepper"],
     "green chili": ["green chili", "hari mirch", "green chilies"],
-
     "lal mirch": ["lal mirch", "red chili", "red chili powder", "cayenne pepper"],
     "red chili": ["red chili", "lal mirch", "red chili powder"],
-
     "suji": ["suji", "sooji", "semolina"],
     "sooji": ["sooji", "suji", "semolina"],
     "semolina": ["semolina", "suji", "sooji"],
-
     "besan": ["besan", "gram flour", "chickpea flour"],
     "gram flour": ["gram flour", "besan", "chickpea flour"],
-
     "poha": ["poha", "flattened rice"],
     "matar": ["matar", "peas", "green peas"],
     "peas": ["peas", "matar", "green peas"],
-
     "bhindi": ["bhindi", "okra", "ladyfinger"],
     "okra": ["okra", "bhindi", "ladyfinger"],
-
     "gobi": ["gobi", "gobhi", "cauliflower"],
     "gobhi": ["gobhi", "gobi", "cauliflower"],
     "cauliflower": ["cauliflower", "gobi", "gobhi"],
-
     "baingan": ["baingan", "eggplant", "brinjal"],
     "eggplant": ["eggplant", "baingan", "brinjal"],
-
     "kaddu": ["kaddu", "pumpkin"],
     "kaju": ["kaju", "cashew", "cashews"],
     "badam": ["badam", "almond", "almonds"],
     "saunf": ["saunf", "fennel", "fennel seeds"],
     "amchur": ["amchur", "amchoor", "dry mango powder"],
     "kasuri methi": ["kasuri methi", "dried fenugreek"],
-
-    # Global Staples & Varieties
     "bread": ["bread", "country bread", "sourdough", "white bread", "whole wheat bread", "french bread", "pita", "rye bread", "brioche", "baguette", "ciabatta", "roti", "naan"],
     "cheese": ["cheese", "cheddar", "mozzarella", "parmesan", "feta", "swiss cheese", "ricotta", "paneer", "cottage cheese"],
     "chicken": ["chicken", "chicken breast", "chicken thighs", "ground chicken", "whole chicken"],
@@ -259,7 +273,6 @@ DISPLAY_NAME_MAP = {
 }
 
 def expand_ingredients(ingredients_list: List[str]) -> str:
-    """Expand generic tags & Hindi aliases with fuzzy typo fallback for broader TF-IDF matching."""
     expanded_terms = set()
     all_keys = list(INGREDIENT_EXPANSIONS.keys())
     
@@ -267,18 +280,15 @@ def expand_ingredients(ingredients_list: List[str]) -> str:
         clean = ing.strip().lower()
         expanded_terms.add(clean)
         
-        # 1. Direct dictionary match
         if clean in INGREDIENT_EXPANSIONS:
             expanded_terms.update(INGREDIENT_EXPANSIONS[clean])
         else:
-            # 2. Substring check
             matched_substring = False
             for parent, varieties in INGREDIENT_EXPANSIONS.items():
                 if parent in clean or clean in parent:
                     expanded_terms.update(varieties)
                     matched_substring = True
             
-            # 3. Fuzzy match for typos e.g., 'panner' -> 'paneer'
             if not matched_substring:
                 close_matches = difflib.get_close_matches(clean, all_keys, n=1, cutoff=0.65)
                 if close_matches:
@@ -288,7 +298,7 @@ def expand_ingredients(ingredients_list: List[str]) -> str:
     return " ".join(expanded_terms)
 
 class SearchRequest(BaseModel):
-    query: str = Field(..., description="Ingredient or dish search string e.g. 'chicken tomato garlic'", example="chicken tomato onion")
+    query: str = Field(..., description="Ingredient or dish search string", example="chicken tomato onion")
     is_vegetarian: Optional[bool] = None
     is_vegan: Optional[bool] = None
     is_budget: Optional[bool] = None
@@ -316,26 +326,124 @@ class RecommendRequest(BaseModel):
     difficulty: Optional[str] = None
     limit: Optional[int] = Field(10, ge=1, le=50)
 
+def filter_candidates(
+    is_vegetarian: bool = None,
+    is_vegan: bool = None,
+    cuisine: str = None,
+    meal_type: str = None,
+    max_calories: int = None,
+    max_cook_time: int = None,
+    max_prep_time: int = None,
+    difficulty: str = None,
+    min_protein: int = None,
+    is_budget: bool = None,
+    budget_tier: str = None
+) -> List[dict]:
+    res = []
+    for r in state.recipes:
+        if cuisine and cuisine.strip() and cuisine.lower() != "all" and r["cuisine"].lower() != cuisine.strip().lower():
+            continue
+        if meal_type and meal_type.strip() and meal_type.lower() != "all" and r["meal_type"].lower() != meal_type.strip().lower():
+            continue
+        if max_calories is not None and max_calories > 0 and r["calories"] > max_calories:
+            continue
+        if max_cook_time is not None and max_cook_time > 0 and r["cook_time"] > max_cook_time:
+            continue
+        if max_prep_time is not None and max_prep_time > 0 and r["prep_time"] > max_prep_time:
+            continue
+        if difficulty and difficulty.strip() and difficulty.lower() != "all" and r["difficulty"].lower() != difficulty.strip().lower():
+            continue
+        if min_protein is not None and min_protein > 0 and r["protein"] < min_protein:
+            continue
+        if is_vegan is True and not r["is_vegan"]:
+            continue
+        if is_vegetarian is True and not r["is_vegetarian"]:
+            continue
+        if is_budget is True and not r["is_budget"]:
+            continue
+        if budget_tier and budget_tier.lower() != "all" and r["budget_tier"].lower() != budget_tier.lower():
+            continue
+        res.append(r)
+    return res
+
+def rank_by_query(query: str, candidates: List[dict], top_n: int = 12) -> List[dict]:
+    if not query or not query.strip():
+        return candidates[:top_n]
+
+    expanded_str = expand_ingredients(query.strip().split())
+    query_terms = [clean_text(t) for t in expanded_str.split() if clean_text(t)]
+    if not query_terms:
+        return candidates[:top_n]
+
+    scored = []
+    for r in candidates:
+        name_lower = r["recipe_name"].lower()
+        ing_lower = r["raw_ingredients"].lower()
+        text_lower = f"{name_lower} {ing_lower} {r['cuisine'].lower()} {r['meal_type'].lower()}"
+
+        score = 0.0
+        for t in query_terms:
+            if t in name_lower:
+                score += 4.0
+            if t in ing_lower:
+                score += 2.0
+            elif t in text_lower:
+                score += 1.0
+
+        if score > 0:
+            pct = min(99.0, round(50.0 + (score / (len(query_terms) * 4.0)) * 49.0, 1))
+            item = dict(r)
+            item["similarity_score"] = pct
+            item["similarity_percent"] = f"{pct}%"
+            scored.append((score, item))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [item for _, item in scored[:top_n]]
+
+def recommend_similar_items(recipe_id: int, candidates: List[dict], top_n: int = 6) -> List[dict]:
+    target = state.recipes_by_id.get(recipe_id)
+    if not target:
+        return []
+
+    target_text = clean_text(f"{target['recipe_name']} {target['raw_ingredients']} {target['cuisine']}")
+    target_tokens = set(target_text.split())
+
+    scored = []
+    for r in candidates:
+        if r["id"] == recipe_id:
+            continue
+        r_tokens = set(clean_text(f"{r['recipe_name']} {r['raw_ingredients']} {r['cuisine']}").split())
+        intersection = target_tokens.intersection(r_tokens)
+        if not intersection:
+            continue
+
+        score = len(intersection) / float(len(target_tokens.union(r_tokens)))
+        pct = min(99.0, round(max(35.0, score * 100.0), 1))
+        item = dict(r)
+        item["similarity_score"] = pct
+        item["similarity_percent"] = f"{pct}%"
+        scored.append((score, item))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [item for _, item in scored[:top_n]]
+
 # --- ENDPOINTS ---
 
 @app.get("/")
 def get_root():
-    """System health check and dataset metrics."""
     ensure_state_loaded()
-    if state.df is None:
-        raise HTTPException(status_code=500, detail="Server model state uninitialized")
     return {
         "status": "online",
         "message": "AI Recipe Builder API is running smoothly",
-        "total_recipes": len(state.df),
-        "engine": "TF-IDF Vectorizer + Cosine Similarity",
+        "total_recipes": len(state.recipes),
+        "engine": "Lightweight In-Memory Search Engine",
         "database": None
     }
 
 @app.get("/recipes")
 def get_recipes(
-    page: int = Query(1, ge=1),
-    limit: int = Query(12, ge=1, le=100),
+    page: int = 1,
+    limit: int = 12,
     search: Optional[str] = None,
     cuisine: Optional[str] = None,
     meal_type: Optional[str] = None,
@@ -348,18 +456,13 @@ def get_recipes(
     max_prep_time: Optional[int] = None,
     difficulty: Optional[str] = None,
     min_protein: Optional[int] = None,
-    sort_by: Optional[str] = Query("id", enum=["id", "recipe_name", "calories", "cook_time", "prep_time", "protein"])
+    sort_by: Optional[str] = "id"
 ):
-    """Retrieve paginated & filtered list of recipes."""
     ensure_state_loaded()
-    if state.df is None:
-        raise HTTPException(status_code=500, detail="Dataset not loaded")
+    page = int(page) if page else 1
+    limit = int(limit) if limit else 12
 
-    df = state.df
-
-    # 1. Filter candidates
-    matching_indices = filter_recipes_dataframe(
-        df,
+    candidates = filter_candidates(
         is_vegetarian=is_vegetarian,
         is_vegan=is_vegan,
         is_budget=is_budget,
@@ -373,87 +476,46 @@ def get_recipes(
         min_protein=min_protein
     )
 
-    # 2. Text Search if provided
     if search and search.strip():
-        search_terms = search.strip().split()
-        expanded_query = expand_ingredients(search_terms)
-        scored_candidates = state.recommender.search_query(expanded_query, df, top_n=len(matching_indices), candidate_indices=matching_indices)
-        matching_indices = [idx for idx, _ in scored_candidates]
-        score_dict = {idx: score for idx, score in scored_candidates}
-    else:
-        score_dict = {}
+        candidates = rank_by_query(search, candidates, top_n=len(candidates))
 
-    # 3. Sorting
-    sub_df = df.loc[matching_indices].copy()
     if sort_by == "recipe_name":
-        sub_df = sub_df.sort_values(by="Recipe Name")
+        candidates.sort(key=lambda r: r["recipe_name"])
     elif sort_by in ["calories", "cook_time", "prep_time", "protein"]:
-        col_map = {"calories": "Calories", "cook_time": "Cook Time", "prep_time": "Prep Time", "protein": "Protein"}
-        sub_df = sub_df.sort_values(by=col_map[sort_by])
+        candidates.sort(key=lambda r: r[sort_by])
 
-    sorted_indices = sub_df.index.tolist()
-
-    # 4. Pagination
-    total_count = len(sorted_indices)
+    total_count = len(candidates)
     total_pages = max(1, (total_count + limit - 1) // limit)
     start_idx = (page - 1) * limit
     end_idx = start_idx + limit
-    page_indices = sorted_indices[start_idx:end_idx]
-
-    recipes = [
-        format_recipe_dict(df.loc[idx], idx, score_dict.get(idx))
-        for idx in page_indices
-    ]
+    page_recipes = candidates[start_idx:end_idx]
 
     return {
-        "recipes": recipes,
+        "recipes": page_recipes,
         "page": page,
         "limit": limit,
         "total_count": total_count,
         "total_pages": total_pages
     }
 
-
 @app.get("/recipe/{recipe_id}")
 def get_recipe_by_id(recipe_id: int):
-    """Retrieve details for a single recipe by ID along with AI similar recommendations."""
     ensure_state_loaded()
-    if state.df is None:
-        raise HTTPException(status_code=500, detail="Dataset not loaded")
-
-    if recipe_id < 0 or recipe_id >= len(state.df):
+    recipe_data = state.recipes_by_id.get(recipe_id)
+    if not recipe_data:
         raise HTTPException(status_code=404, detail=f"Recipe with ID {recipe_id} not found")
 
-    row = state.df.loc[recipe_id]
-    recipe_data = format_recipe_dict(row, recipe_id)
-
-    # Get top 6 similar recipes using ML model
-    similar_tuples = state.recommender.recommend_similar(recipe_id, state.df, top_n=6)
-    similar_recipes = [
-        format_recipe_dict(state.df.loc[idx], idx, similarity_score=score)
-        for idx, score in similar_tuples
-    ]
-
-    recipe_data["similar_recipes"] = similar_recipes
-    return recipe_data
+    res = dict(recipe_data)
+    res["similar_recipes"] = recommend_similar_items(recipe_id, state.recipes, top_n=6)
+    return res
 
 @app.post("/search")
 def search_recipes(payload: SearchRequest):
-    """
-    Search recipes based on ingredient/dish text query and optional filters.
-    Returns TF-IDF ranked recipes with similarity match scores.
-    """
     ensure_state_loaded()
-    if state.df is None or state.recommender is None:
-        raise HTTPException(status_code=500, detail="Search engine not ready")
-
     if not payload.query or not payload.query.strip():
         raise HTTPException(status_code=400, detail="Search query must not be empty")
 
-    df = state.df
-
-    matching_indices = filter_recipes_dataframe(
-        df,
+    candidates = filter_candidates(
         is_vegetarian=payload.is_vegetarian,
         is_vegan=payload.is_vegan,
         is_budget=payload.is_budget,
@@ -467,24 +529,7 @@ def search_recipes(payload: SearchRequest):
         min_protein=payload.min_protein
     )
 
-    if not matching_indices:
-        return {"recipes": [], "query": payload.query, "total": 0}
-
-    search_terms = payload.query.strip().split()
-    expanded_query = expand_ingredients(search_terms)
-
-    scored_candidates = state.recommender.search_query(
-        expanded_query,
-        df,
-        top_n=payload.limit or 10,
-        candidate_indices=matching_indices
-    )
-
-    results = [
-        format_recipe_dict(df.loc[idx], idx, similarity_score=score)
-        for idx, score in scored_candidates
-    ]
-
+    results = rank_by_query(payload.query, candidates, top_n=payload.limit or 10)
     return {
         "recipes": results,
         "query": payload.query,
@@ -493,20 +538,8 @@ def search_recipes(payload: SearchRequest):
 
 @app.post("/recommend")
 def recommend_recipes(payload: RecommendRequest):
-    """
-    Generate AI recipe recommendations based on:
-    - User input ingredient list e.g. ["chicken", "garlic", "tomato"]
-    - OR an existing recipe_id
-    """
     ensure_state_loaded()
-    if state.df is None or state.recommender is None:
-        raise HTTPException(status_code=500, detail="Recommendation engine not ready")
-
-    df = state.df
-
-    # 1. Filter indices
-    matching_indices = filter_recipes_dataframe(
-        df,
+    candidates = filter_candidates(
         is_vegetarian=payload.is_vegetarian,
         is_vegan=payload.is_vegan,
         is_budget=payload.is_budget,
@@ -518,30 +551,13 @@ def recommend_recipes(payload: RecommendRequest):
         difficulty=payload.difficulty
     )
 
-    scored_candidates = []
-
-    if payload.recipe_id is not None and 0 <= payload.recipe_id < len(df):
-        scored_candidates = state.recommender.recommend_similar(
-            payload.recipe_id,
-            df,
-            top_n=payload.limit or 10,
-            candidate_indices=matching_indices
-        )
+    if payload.recipe_id is not None:
+        results = recommend_similar_items(payload.recipe_id, candidates, top_n=payload.limit or 10)
     elif payload.ingredients and len(payload.ingredients) > 0:
-        query_str = expand_ingredients(payload.ingredients)
-        scored_candidates = state.recommender.search_query(
-            query_str,
-            df,
-            top_n=payload.limit or 10,
-            candidate_indices=matching_indices
-        )
+        query_str = " ".join(payload.ingredients)
+        results = rank_by_query(query_str, candidates, top_n=payload.limit or 10)
     else:
         raise HTTPException(status_code=400, detail="Please provide either 'recipe_id' or a non-empty 'ingredients' list.")
-
-    results = [
-        format_recipe_dict(df.loc[idx], idx, similarity_score=score)
-        for idx, score in scored_candidates
-    ]
 
     return {
         "recipes": results,
@@ -550,29 +566,26 @@ def recommend_recipes(payload: RecommendRequest):
 
 @app.get("/cuisines")
 def get_cuisines():
-    """Returns unique cuisines and recipe count breakdown."""
     ensure_state_loaded()
-    if state.df is None:
-        raise HTTPException(status_code=500, detail="Dataset not loaded")
-
-    counts = state.df['Cuisine'].value_counts().to_dict()
-    cuisines_list = [{"name": c, "count": int(cnt)} for c, cnt in counts.items()]
+    counts = {}
+    for r in state.recipes:
+        c = r["cuisine"]
+        counts[c] = counts.get(c, 0) + 1
+    cuisines_list = [{"name": c, "count": cnt} for c, cnt in counts.items()]
     return {"cuisines": cuisines_list}
 
 @app.get("/meal-types")
 def get_meal_types():
-    """Returns unique meal types and recipe count breakdown."""
     ensure_state_loaded()
-    if state.df is None:
-        raise HTTPException(status_code=500, detail="Dataset not loaded")
-
-    counts = state.df['Meal Type'].value_counts().to_dict()
-    meal_types_list = [{"name": m, "count": int(cnt)} for m, cnt in counts.items()]
+    counts = {}
+    for r in state.recipes:
+        m = r["meal_type"]
+        counts[m] = counts.get(m, 0) + 1
+    meal_types_list = [{"name": m, "count": cnt} for m, cnt in counts.items()]
     return {"meal_types": meal_types_list}
 
 @app.get("/ingredients/autocomplete")
 def autocomplete_ingredients(q: str = Query("", min_length=1)):
-    """Search unique ingredients for live multi-select autocompletion with Hindi display tags and fuzzy matching."""
     ensure_state_loaded()
     if not q or not q.strip():
         return {"ingredients": []}
@@ -580,12 +593,10 @@ def autocomplete_ingredients(q: str = Query("", min_length=1)):
     query_lower = q.lower().strip()
     matches = []
 
-    # 1. Direct or fuzzy lookup in DISPLAY_NAME_MAP / INGREDIENT_EXPANSIONS
     matched_key = None
     if query_lower in INGREDIENT_EXPANSIONS:
         matched_key = query_lower
     else:
-        # Check fuzzy match
         close = difflib.get_close_matches(query_lower, list(INGREDIENT_EXPANSIONS.keys()), n=1, cutoff=0.65)
         if close:
             matched_key = close[0]
@@ -594,7 +605,6 @@ def autocomplete_ingredients(q: str = Query("", min_length=1)):
         display_label = DISPLAY_NAME_MAP.get(matched_key, matched_key.capitalize())
         matches.append(display_label)
 
-    # 2. Gather matching dataset unique ingredients
     for item in state.unique_ingredients:
         ing_name = item["ingredient"]
         if query_lower in ing_name.lower() or (matched_key and matched_key in ing_name.lower()):
@@ -602,4 +612,3 @@ def autocomplete_ingredients(q: str = Query("", min_length=1)):
                 matches.append(ing_name)
 
     return {"ingredients": matches[:15]}
-
