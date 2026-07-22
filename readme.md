@@ -1,3 +1,5 @@
+live demo: https://kitchen-kraft-theta.vercel.app/
+
 # AI Recipe Builder 🥗
 
 A production-quality, high-performance **AI Recipe Builder & Search Engine** web application built with **FastAPI, Pandas, Scikit-Learn (TF-IDF + Cosine Similarity), React 18, Vite, and Tailwind CSS**.
