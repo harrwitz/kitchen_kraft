@@ -4,7 +4,7 @@
   "rewrites": [
     {
       "source": "/(recipes|recipe/.*|search|recommend|cuisines|meal-types|ingredients/.*)",
-      "destination": "backend/main.py"
+      "destination": "/api/index.py"
     },
     {
       "source": "/((?!assets/.*|.*\\.js|.*\\.css|.*\\.png|.*\\.jpg|.*\\.svg|.*\\.ico).*)",

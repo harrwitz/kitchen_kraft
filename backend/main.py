@@ -23,15 +23,14 @@ class AppState:
 
 state = AppState()
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+def ensure_state_loaded():
     """
-    On Startup:
-    1. Load recipes.csv once into memory.
-    2. Clean missing values & validate dataset.
-    3. Initialize and train/load TF-IDF recommendation model.
-    4. Load pre-analyzed unique ingredients.
+    Ensures dataset, recommender, and unique ingredients are loaded into memory.
+    Safe for both serverless cold starts and Uvicorn server startup.
     """
+    if state.df is not None:
+        return
+
     print("Initializing AI Recipe Builder Backend...")
     if not os.path.exists(CSV_PATH):
         raise RuntimeError(f"Permanent dataset missing at {CSV_PATH}. Run prepare_dataset.py first!")
@@ -74,6 +73,11 @@ async def lifespan(app: FastAPI):
             print(f"Warning loading unique_ingredients.json: {e}")
 
     print("Backend initialization complete! Ready to accept requests.")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for ASGI servers."""
+    ensure_state_loaded()
     yield
     print("Shutting down AI Recipe Builder Backend...")
 
@@ -317,6 +321,7 @@ class RecommendRequest(BaseModel):
 @app.get("/")
 def get_root():
     """System health check and dataset metrics."""
+    ensure_state_loaded()
     if state.df is None:
         raise HTTPException(status_code=500, detail="Server model state uninitialized")
     return {
@@ -346,6 +351,7 @@ def get_recipes(
     sort_by: Optional[str] = Query("id", enum=["id", "recipe_name", "calories", "cook_time", "prep_time", "protein"])
 ):
     """Retrieve paginated & filtered list of recipes."""
+    ensure_state_loaded()
     if state.df is None:
         raise HTTPException(status_code=500, detail="Dataset not loaded")
 
@@ -411,6 +417,7 @@ def get_recipes(
 @app.get("/recipe/{recipe_id}")
 def get_recipe_by_id(recipe_id: int):
     """Retrieve details for a single recipe by ID along with AI similar recommendations."""
+    ensure_state_loaded()
     if state.df is None:
         raise HTTPException(status_code=500, detail="Dataset not loaded")
 
@@ -436,6 +443,7 @@ def search_recipes(payload: SearchRequest):
     Search recipes based on ingredient/dish text query and optional filters.
     Returns TF-IDF ranked recipes with similarity match scores.
     """
+    ensure_state_loaded()
     if state.df is None or state.recommender is None:
         raise HTTPException(status_code=500, detail="Search engine not ready")
 
@@ -490,6 +498,7 @@ def recommend_recipes(payload: RecommendRequest):
     - User input ingredient list e.g. ["chicken", "garlic", "tomato"]
     - OR an existing recipe_id
     """
+    ensure_state_loaded()
     if state.df is None or state.recommender is None:
         raise HTTPException(status_code=500, detail="Recommendation engine not ready")
 
@@ -542,6 +551,7 @@ def recommend_recipes(payload: RecommendRequest):
 @app.get("/cuisines")
 def get_cuisines():
     """Returns unique cuisines and recipe count breakdown."""
+    ensure_state_loaded()
     if state.df is None:
         raise HTTPException(status_code=500, detail="Dataset not loaded")
 
@@ -552,6 +562,7 @@ def get_cuisines():
 @app.get("/meal-types")
 def get_meal_types():
     """Returns unique meal types and recipe count breakdown."""
+    ensure_state_loaded()
     if state.df is None:
         raise HTTPException(status_code=500, detail="Dataset not loaded")
 
@@ -562,6 +573,7 @@ def get_meal_types():
 @app.get("/ingredients/autocomplete")
 def autocomplete_ingredients(q: str = Query("", min_length=1)):
     """Search unique ingredients for live multi-select autocompletion with Hindi display tags and fuzzy matching."""
+    ensure_state_loaded()
     if not q or not q.strip():
         return {"ingredients": []}
 
