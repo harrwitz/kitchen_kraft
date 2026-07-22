@@ -25,93 +25,111 @@ state = AppState()
 def ensure_state_loaded():
     """
     Fast, lightweight, zero-heavy-dependency state loader.
-    Loads recipes and unique ingredients instantly in < 0.2s.
+    Supports bundled Python module import for Vercel NFT serverless bundling.
     """
     if state.is_loaded:
         return
 
     print("Initializing AI Recipe Builder Backend (Lightweight Serverless Engine)...")
-    if not os.path.exists(CSV_PATH):
-        raise RuntimeError(f"Permanent dataset missing at {CSV_PATH}.")
+
+    raw_data = []
+
+    # 1. Try Python Module Import (Vercel NFT Auto-Bundled)
+    try:
+        from recipes_data import RECIPES_DATA
+        raw_data = RECIPES_DATA
+        print(f"Loaded {len(raw_data)} recipes from bundled recipes_data module.")
+    except Exception as e:
+        print(f"Module import fallback, trying CSV: {e}")
+
+    # 2. Try CSV file fallback
+    if not raw_data and os.path.exists(CSV_PATH):
+        try:
+            with open(CSV_PATH, 'r', encoding='utf-8', errors='ignore') as f:
+                raw_data = list(csv.DictReader(f))
+                print(f"Loaded {len(raw_data)} recipes from {CSV_PATH}.")
+        except Exception as e:
+            print(f"CSV load error: {e}")
+
+    if not raw_data:
+        raise RuntimeError("No recipe data available to load!")
 
     loaded_recipes = []
     loaded_by_id = {}
 
-    with open(CSV_PATH, 'r', encoding='utf-8', errors='ignore') as f:
-        reader = csv.DictReader(f)
-        for idx, row in enumerate(reader):
-            title = (row.get('Recipe Name') or 'Untitled Recipe').strip()
-            ing_text = (row.get('Ingredients') or '').strip()
-            instructions = (row.get('Instructions') or '').strip()
-            cuisine = (row.get('Cuisine') or 'American').strip()
-            meal_type = (row.get('Meal Type') or 'Dinner').strip()
+    for idx, row in enumerate(raw_data):
+        title = (row.get('Recipe Name') or 'Untitled Recipe').strip()
+        ing_text = (row.get('Ingredients') or '').strip()
+        instructions = (row.get('Instructions') or '').strip()
+        cuisine = (row.get('Cuisine') or 'American').strip()
+        meal_type = (row.get('Meal Type') or 'Dinner').strip()
 
-            if ing_text.startswith('[') and ing_text.endswith(']'):
-                try:
-                    import ast
-                    ing_parsed = ast.literal_eval(ing_text)
-                    ingredients_list = [i.strip() for i in ing_parsed if i.strip()]
-                except Exception:
-                    ingredients_list = [i.strip() for i in ing_text.split(',') if i.strip()]
-            else:
+        if ing_text.startswith('[') and ing_text.endswith(']'):
+            try:
+                import ast
+                ing_parsed = ast.literal_eval(ing_text)
+                ingredients_list = [i.strip() for i in ing_parsed if i.strip()]
+            except Exception:
                 ingredients_list = [i.strip() for i in ing_text.split(',') if i.strip()]
+        else:
+            ingredients_list = [i.strip() for i in ing_text.split(',') if i.strip()]
 
-            try: prep_time = int(row.get('Prep Time') or 15)
-            except ValueError: prep_time = 15
+        try: prep_time = int(row.get('Prep Time') or 15)
+        except ValueError: prep_time = 15
 
-            try: cook_time = int(row.get('Cook Time') or 30)
-            except ValueError: cook_time = 30
+        try: cook_time = int(row.get('Cook Time') or 30)
+        except ValueError: cook_time = 30
 
-            try: calories = int(row.get('Calories') or 400)
-            except ValueError: calories = 400
+        try: calories = int(row.get('Calories') or 400)
+        except ValueError: calories = 400
 
-            try: protein = int(row.get('Protein') or 20)
-            except ValueError: protein = 20
+        try: protein = int(row.get('Protein') or 20)
+        except ValueError: protein = 20
 
-            try: carbs = int(row.get('Carbs') or 40)
-            except ValueError: carbs = 40
+        try: carbs = int(row.get('Carbs') or 40)
+        except ValueError: carbs = 40
 
-            try: fat = int(row.get('Fat') or 15)
-            except ValueError: fat = 15
+        try: fat = int(row.get('Fat') or 15)
+        except ValueError: fat = 15
 
-            try: servings = int(row.get('Servings') or 4)
-            except ValueError: servings = 4
+        try: servings = int(row.get('Servings') or 4)
+        except ValueError: servings = 4
 
-            difficulty = (row.get('Difficulty') or 'Medium').strip()
+        difficulty = (row.get('Difficulty') or 'Medium').strip()
 
-            is_veg = check_vegetarian(ing_text, title)
-            is_vgn = check_vegan(ing_text, title)
-            budget_info = calculate_recipe_budget(row)
-            smart_image = get_smart_food_image(title, ing_text, cuisine, meal_type, is_veg)
+        is_veg = check_vegetarian(ing_text, title)
+        is_vgn = check_vegan(ing_text, title)
+        budget_info = calculate_recipe_budget(row)
+        smart_image = get_smart_food_image(title, ing_text, cuisine, meal_type, is_veg)
 
-            item = {
-                "id": idx,
-                "recipe_name": title,
-                "ingredients": ingredients_list,
-                "raw_ingredients": ing_text,
-                "instructions": instructions,
-                "cuisine": cuisine,
-                "meal_type": meal_type,
-                "prep_time": prep_time,
-                "cook_time": cook_time,
-                "total_time": prep_time + cook_time,
-                "calories": calories,
-                "protein": protein,
-                "carbs": carbs,
-                "fat": fat,
-                "difficulty": difficulty,
-                "servings": servings,
-                "image_url": smart_image,
-                "is_vegetarian": is_veg,
-                "is_vegan": is_vgn,
-                "is_budget": budget_info["is_budget"],
-                "budget_tier": budget_info["budget_tier"],
-                "budget_symbol": budget_info["budget_symbol"],
-                "cost_per_serving": budget_info["cost_per_serving"],
-                "total_batch_cost": budget_info["total_batch_cost"]
-            }
-            loaded_recipes.append(item)
-            loaded_by_id[idx] = item
+        item = {
+            "id": idx,
+            "recipe_name": title,
+            "ingredients": ingredients_list,
+            "raw_ingredients": ing_text,
+            "instructions": instructions,
+            "cuisine": cuisine,
+            "meal_type": meal_type,
+            "prep_time": prep_time,
+            "cook_time": cook_time,
+            "total_time": prep_time + cook_time,
+            "calories": calories,
+            "protein": protein,
+            "carbs": carbs,
+            "fat": fat,
+            "difficulty": difficulty,
+            "servings": servings,
+            "image_url": smart_image,
+            "is_vegetarian": is_veg,
+            "is_vegan": is_vgn,
+            "is_budget": budget_info["is_budget"],
+            "budget_tier": budget_info["budget_tier"],
+            "budget_symbol": budget_info["budget_symbol"],
+            "cost_per_serving": budget_info["cost_per_serving"],
+            "total_batch_cost": budget_info["total_batch_cost"]
+        }
+        loaded_recipes.append(item)
+        loaded_by_id[idx] = item
 
     state.recipes = loaded_recipes
     state.recipes_by_id = loaded_by_id
