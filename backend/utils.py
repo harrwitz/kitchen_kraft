@@ -16,9 +16,6 @@ HIGH_COST_KEYWORDS = {
 }
 
 def calculate_recipe_budget(row: pd.Series) -> dict:
-    """
-    Calculates estimated cost per serving and budget tier based on ingredients and servings.
-    """
     ing_val = row.get('Ingredients') if row.get('Ingredients') is not None else row.get('ing', '')
     ing_text = str(ing_val or '').lower()
     try:
@@ -43,7 +40,6 @@ def calculate_recipe_budget(row: pd.Series) -> dict:
         else:
             batch_cost += 1.60
 
-    # Ensure reasonable base batch cost
     batch_cost = max(2.50, batch_cost)
     cost_per_serving = round(batch_cost / servings, 2)
     total_batch_cost = round(batch_cost, 2)
@@ -81,9 +77,6 @@ def filter_recipes_dataframe(
     is_budget: bool = None,
     budget_tier: str = None
 ) -> list[int]:
-    """
-    Applies filter parameters against DataFrame and returns matching row indices.
-    """
     mask = pd.Series([True] * len(df), index=df.index)
 
     if cuisine and cuisine.strip() and cuisine.lower() != "all":
@@ -131,77 +124,67 @@ def filter_recipes_dataframe(
     return filtered_indices
 
 FOOD_IMAGES_CATEGORIES = {
-    "cocktails_drinks": [
-        "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1536935338788-846bb9981813?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1556881286-fc6915169721?auto=format&fit=crop&w=800&q=80"
+    "paneer": [
+        "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=800&q=80"
     ],
-    "smoothie_juice": [
-        "https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1623065422902-30a2d299bbe4?auto=format&fit=crop&w=800&q=80"
+    "samosa": [
+        "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=80"
     ],
-    "roast_chicken": [
-        "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=800&q=80"
-    ],
-    "chicken": [
-        "https://images.unsplash.com/photo-1532550907401-a500c9a57435?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?auto=format&fit=crop&w=800&q=80"
+    "cheesecake_dessert": [
+        "https://images.unsplash.com/photo-1524351199678-941a58a3df50?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=800&q=80"
     ],
     "squash_pumpkin": [
-        "https://images.unsplash.com/photo-1570586437263-ab629fccc818?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1508747703725-719777637510?auto=format&fit=crop&w=800&q=80"
+        "https://images.unsplash.com/photo-1570586437263-ab629fccc818?auto=format&fit=crop&w=800&q=80"
     ],
-    "beef_steak": [
-        "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1558030006-450675393462?auto=format&fit=crop&w=800&q=80"
+    "falafel_mediterranean": [
+        "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80"
     ],
-    "salmon_fish": [
-        "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=800&q=80"
-    ],
-    "seafood_shrimp": [
-        "https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1559742811-8228a365ccdf?auto=format&fit=crop&w=800&q=80"
-    ],
-    "burger": [
-        "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=800&q=80"
-    ],
-    "pizza": [
-        "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=800&q=80"
-    ],
-    "lasagna": [
-        "https://images.unsplash.com/photo-1574894709920-11b28e7367e3?auto=format&fit=crop&w=800&q=80"
-    ],
-    "pasta": [
-        "https://images.unsplash.com/photo-1621996346565-e3d5d6281358?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80"
-    ],
-    "mac_cheese": [
-        "https://images.unsplash.com/photo-1543339308-43e59d6b73a6?auto=format&fit=crop&w=800&q=80"
-    ],
-    "tacos_mexican": [
-        "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?auto=format&fit=crop&w=800&q=80"
-    ],
-    "salad": [
+    "beets_salad": [
         "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80",
         "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80"
     ],
-    "soup_stew": [
-        "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1608897013039-887f21d8c804?auto=format&fit=crop&w=800&q=80"
+    "chicken_gratin_roast": [
+        "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1532550907401-a500c9a57435?auto=format&fit=crop&w=800&q=80"
     ],
-    "curry_paneer": [
-        "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=80"
+    "potatoes": [
+        "https://images.unsplash.com/photo-1518013431117-eb1465fa5752?auto=format&fit=crop&w=800&q=80"
+    ],
+    "cocktails_drinks": [
+        "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1556881286-fc6915169721?auto=format&fit=crop&w=800&q=80"
+    ],
+    "smoothie_juice": [
+        "https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=800&q=80"
+    ],
+    "beef_steak": [
+        "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80"
+    ],
+    "salmon_fish": [
+        "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80"
+    ],
+    "seafood_shrimp": [
+        "https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?auto=format&fit=crop&w=800&q=80"
+    ],
+    "burger": [
+        "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80"
+    ],
+    "pizza": [
+        "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80"
+    ],
+    "pasta": [
+        "https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80"
+    ],
+    "soup_stew": [
+        "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=800&q=80"
+    ],
+    "tacos_mexican": [
+        "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=800&q=80"
     ],
     "ramen_noodles": [
-        "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1617093727343-374698b1b08d?auto=format&fit=crop&w=800&q=80"
+        "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=800&q=80"
     ],
     "sushi": [
         "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=800&q=80"
@@ -210,90 +193,122 @@ FOOD_IMAGES_CATEGORIES = {
         "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=800&q=80"
     ],
     "breakfast_pancakes": [
-        "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=800&q=80"
-    ],
-    "dessert_pie_cake": [
-        "https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=800&q=80"
-    ],
-    "potato": [
-        "https://images.unsplash.com/photo-1518013431117-eb1465fa5752?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=800&q=80"
+        "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=800&q=80"
     ],
     "general": [
-        "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1493770348161-369560ae357d?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?auto=format&fit=crop&w=800&q=80"
+        "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=800&q=80"
     ]
 }
 
-def get_smart_food_image(recipe_name: str, ingredients_text: str, cuisine: str, meal_type: str, is_veg: bool) -> str:
+def get_smart_food_image(recipe_name: str, ingredients_text: str = "", cuisine: str = "", meal_type: str = "", is_veg: bool = False, image_name: str = "") -> str:
     name_lower = (recipe_name or "").lower()
-    combined = (name_lower + " " + (ingredients_text or "")).lower()
+    slug_lower = (image_name or "").lower()
+    combined = (name_lower + " " + slug_lower + " " + (ingredients_text or "")).lower()
     name_hash = abs(hash(recipe_name or "food"))
 
-    # Priority matching on cocktails & drinks
-    if any(w in name_lower for w in [
-        "alimony", "cocktail", "drink", "beverage", "punch", "sangria", "mojito", "margarita",
-        "martini", "cynar", "sherry", "vermouth", "spritz", "bourbon", "whiskey", "rum", "tequila",
-        "vodka", "brandy", "mocktail", "tonic", "fizz", "highball", "sour", "slushie", "negroni", "manhattan"
-    ]) or any(w in combined for w in ["sherry", "cynar", "dry vermouth", "gin", "bourbon", "tequila", "triple sec", "simple syrup", "angostura"]):
-        pool = FOOD_IMAGES_CATEGORIES["cocktails_drinks"]
-    elif any(w in name_lower for w in ["smoothie", "juice", "lemonade", "shake", "milkshake"]):
-        pool = FOOD_IMAGES_CATEGORIES["smoothie_juice"]
-    # Priority matching on specific dish titles
-    elif any(w in name_lower for w in ["roast chicken", "roasted chicken"]):
-        pool = FOOD_IMAGES_CATEGORIES["roast_chicken"]
-    elif any(w in name_lower for w in ["squash", "pumpkin"]):
+    # 1. Exact Samosa check
+    if any(w in name_lower or w in slug_lower for w in ["samosa", "samosas"]):
+        pool = FOOD_IMAGES_CATEGORIES["samosa"]
+
+    # 2. Paneer check (must NOT be samosa!)
+    elif any(w in name_lower or w in slug_lower for w in ["paneer"]):
+        pool = FOOD_IMAGES_CATEGORIES["paneer"]
+
+    # 3. Cheesecake / Chhena Poda check
+    elif any(w in name_lower or w in slug_lower for w in ["cheesecake", "chhena poda", "chhenapoda"]):
+        pool = FOOD_IMAGES_CATEGORIES["cheesecake_dessert"]
+
+    # 4. Falafel check
+    elif any(w in name_lower or w in slug_lower for w in ["falafel", "falafels"]):
+        pool = FOOD_IMAGES_CATEGORIES["falafel_mediterranean"]
+
+    # 5. Squash / Pumpkin check
+    elif any(w in name_lower or w in slug_lower for w in ["squash", "pumpkin"]):
         pool = FOOD_IMAGES_CATEGORIES["squash_pumpkin"]
-    elif any(w in name_lower for w in ["lasagna"]):
-        pool = FOOD_IMAGES_CATEGORIES["lasagna"]
-    elif any(w in name_lower for w in ["macaroni", "mac and cheese"]):
-        pool = FOOD_IMAGES_CATEGORIES["mac_cheese"]
-    elif any(w in name_lower for w in ["burger", "cheeseburger"]):
+
+    # 6. Beets / Salad check
+    elif any(w in name_lower or w in slug_lower for w in ["beet", "beets"]):
+        pool = FOOD_IMAGES_CATEGORIES["beets_salad"]
+
+    # 7. Chicken / Poultry check
+    elif any(w in name_lower or w in slug_lower for w in ["chicken", "poultry", "turkey"]):
+        pool = FOOD_IMAGES_CATEGORIES["chicken_gratin_roast"]
+
+    # 8. Potatoes check
+    elif any(w in name_lower or w in slug_lower for w in ["potato", "potatoes", "spud"]):
+        pool = FOOD_IMAGES_CATEGORIES["potatoes"]
+
+    # 9. Drinks & Cocktails check
+    elif any(w in name_lower or w in slug_lower for w in ["alimony", "cocktail", "margarita", "martini", "mojito", "sangria", "negroni", "manhattan", "toddy", "punch", "spritz", "bourbon", "whiskey", "rum", "tequila", "beverage"]):
+        pool = FOOD_IMAGES_CATEGORIES["cocktails_drinks"]
+
+    # 10. Smoothie & Juice check
+    elif any(w in name_lower or w in slug_lower for w in ["smoothie", "juice", "milkshake", "lemonade"]):
+        pool = FOOD_IMAGES_CATEGORIES["smoothie_juice"]
+
+    # 11. Burgers
+    elif any(w in name_lower or w in slug_lower for w in ["burger", "cheeseburger"]):
         pool = FOOD_IMAGES_CATEGORIES["burger"]
-    elif any(w in name_lower for w in ["pizza"]):
+
+    # 12. Pizza
+    elif any(w in name_lower or w in slug_lower for w in ["pizza"]):
         pool = FOOD_IMAGES_CATEGORIES["pizza"]
-    elif any(w in name_lower for w in ["taco", "burrito", "nacho", "quesadilla", "enchilada"]):
-        pool = FOOD_IMAGES_CATEGORIES["tacos_mexican"]
-    elif any(w in name_lower for w in ["salmon", "tuna", "trout"]):
-        pool = FOOD_IMAGES_CATEGORIES["salmon_fish"]
-    elif any(w in name_lower for w in ["shrimp", "prawn", "lobster", "crab", "seafood"]):
-        pool = FOOD_IMAGES_CATEGORIES["seafood_shrimp"]
-    elif any(w in name_lower for w in ["steak", "beef", "brisket", "ribeye", "filet"]):
-        pool = FOOD_IMAGES_CATEGORIES["beef_steak"]
-    elif any(w in name_lower for w in ["chicken", "poultry", "turkey", "wing"]):
-        pool = FOOD_IMAGES_CATEGORIES["chicken"]
-    elif any(w in name_lower for w in ["pasta", "spaghetti", "penne", "fettuccine", "rigatoni", "noodle"]):
+
+    # 13. Pasta
+    elif any(w in name_lower or w in slug_lower for w in ["pasta", "spaghetti", "penne", "fettuccine", "lasagna", "macaroni"]):
         pool = FOOD_IMAGES_CATEGORIES["pasta"]
-    elif any(w in name_lower for w in ["salad", "greens"]):
-        pool = FOOD_IMAGES_CATEGORIES["salad"]
-    elif any(w in name_lower for w in ["soup", "stew", "chowder", "bisque", "broth"]):
-        pool = FOOD_IMAGES_CATEGORIES["soup_stew"]
-    elif any(w in name_lower for w in ["paneer", "tikka", "dal", "curry", "masala"]):
-        pool = FOOD_IMAGES_CATEGORIES["curry_paneer"]
-    elif any(w in name_lower for w in ["ramen", "pho", "dumpling", "tofu"]):
-        pool = FOOD_IMAGES_CATEGORIES["ramen_noodles"]
-    elif any(w in name_lower for w in ["sushi", "sashimi", "roll"]):
-        pool = FOOD_IMAGES_CATEGORIES["sushi"]
-    elif any(w in name_lower for w in ["sandwich", "panini", "wrap", "toast"]):
-        pool = FOOD_IMAGES_CATEGORIES["sandwich"]
-    elif any(w in name_lower for w in ["pancake", "waffle", "french toast"]):
-        pool = FOOD_IMAGES_CATEGORIES["breakfast_pancakes"]
-    elif any(w in name_lower for w in ["pie", "cake", "tart", "brownie", "ice cream", "cookie"]):
-        pool = FOOD_IMAGES_CATEGORIES["dessert_pie_cake"]
-    # Fallback to combined ingredient checking
-    elif any(w in combined for w in ["chicken", "poultry"]):
-        pool = FOOD_IMAGES_CATEGORIES["chicken"]
-    elif any(w in combined for w in ["beef", "steak", "pork", "lamb"]):
+
+    # 14. Beef & Steak
+    elif any(w in name_lower or w in slug_lower for w in ["steak", "beef", "brisket", "ribeye"]):
         pool = FOOD_IMAGES_CATEGORIES["beef_steak"]
-    elif any(w in combined for w in ["fish", "salmon", "shrimp", "seafood"]):
+
+    # 15. Salmon & Seafood
+    elif any(w in name_lower or w in slug_lower for w in ["salmon", "tuna", "fish"]):
+        pool = FOOD_IMAGES_CATEGORIES["salmon_fish"]
+    elif any(w in name_lower or w in slug_lower for w in ["shrimp", "seafood", "lobster", "crab"]):
+        pool = FOOD_IMAGES_CATEGORIES["seafood_shrimp"]
+
+    # 16. Soup & Stew
+    elif any(w in name_lower or w in slug_lower for w in ["soup", "stew", "chowder", "bisque", "broth"]):
+        pool = FOOD_IMAGES_CATEGORIES["soup_stew"]
+
+    # 17. Tacos & Mexican
+    elif any(w in name_lower or w in slug_lower for w in ["taco", "burrito", "quesadilla", "enchilada"]):
+        pool = FOOD_IMAGES_CATEGORIES["tacos_mexican"]
+
+    # 18. Ramen & Asian
+    elif any(w in name_lower or w in slug_lower for w in ["ramen", "pho", "dumpling", "tofu", "noodle"]):
+        pool = FOOD_IMAGES_CATEGORIES["ramen_noodles"]
+
+    # 19. Sushi
+    elif any(w in name_lower or w in slug_lower for w in ["sushi", "sashimi"]):
+        pool = FOOD_IMAGES_CATEGORIES["sushi"]
+
+    # 20. Sandwich
+    elif any(w in name_lower or w in slug_lower for w in ["sandwich", "panini", "wrap", "toast"]):
+        pool = FOOD_IMAGES_CATEGORIES["sandwich"]
+
+    # 21. Pancakes & Breakfast
+    elif any(w in name_lower or w in slug_lower for w in ["pancake", "waffle", "french toast"]):
+        pool = FOOD_IMAGES_CATEGORIES["breakfast_pancakes"]
+
+    # 22. Indian Curries (general non-paneer)
+    elif any(w in name_lower or w in slug_lower for w in ["tikka", "dal", "curry", "masala"]):
+        pool = FOOD_IMAGES_CATEGORIES["paneer"]
+
+    # 23. Desserts
+    elif any(w in name_lower or w in slug_lower for w in ["cake", "pie", "tart", "brownie", "ice cream", "cookie"]):
+        pool = FOOD_IMAGES_CATEGORIES["cheesecake_dessert"]
+
+    # Fallback to combined ingredients
+    elif any(w in combined for w in ["chicken", "poultry"]):
+        pool = FOOD_IMAGES_CATEGORIES["chicken_gratin_roast"]
+    elif any(w in combined for w in ["beef", "steak"]):
+        pool = FOOD_IMAGES_CATEGORIES["beef_steak"]
+    elif any(w in combined for w in ["fish", "salmon", "shrimp"]):
         pool = FOOD_IMAGES_CATEGORIES["salmon_fish"]
     elif any(w in combined for w in ["pasta", "spaghetti"]):
         pool = FOOD_IMAGES_CATEGORIES["pasta"]
-    elif any(w in combined for w in ["salad", "lettuce", "greens"]):
-        pool = FOOD_IMAGES_CATEGORIES["salad"]
     elif any(w in combined for w in ["soup", "stew"]):
         pool = FOOD_IMAGES_CATEGORIES["soup_stew"]
     else:
@@ -302,7 +317,6 @@ def get_smart_food_image(recipe_name: str, ingredients_text: str, cuisine: str, 
     return pool[name_hash % len(pool)]
 
 def format_recipe_dict(row: pd.Series, recipe_id: int, similarity_score: float = None) -> dict:
-    """Format DataFrame row into clean JSON API response object."""
     ing_raw = row['Ingredients']
     if isinstance(ing_raw, str):
         ingredients_list = [i.strip() for i in ing_raw.split(',') if i.strip()]
@@ -353,4 +367,3 @@ def format_recipe_dict(row: pd.Series, recipe_id: int, similarity_score: float =
         res["similarity_percent"] = f"{pct}%"
 
     return res
-
