@@ -8,6 +8,7 @@ if backend_dir not in sys.path:
 
 import csv
 import json
+import sqlite3
 import difflib
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, status
@@ -18,6 +19,7 @@ from typing import Optional, List
 from preprocess import clean_text, check_vegetarian, check_vegan
 from utils import calculate_recipe_budget, get_smart_food_image
 
+DB_PATH = os.path.join(os.path.dirname(__file__), "recipes.db")
 CSV_PATH = os.path.join(os.path.dirname(__file__), "recipes.csv")
 UNIQUE_INGREDIENTS_PATH = os.path.join(os.path.dirname(__file__), "unique_ingredients.json")
 
@@ -32,32 +34,55 @@ state = AppState()
 def ensure_state_loaded():
     """
     Fast, lightweight, zero-heavy-dependency state loader.
-    Supports gzipped compact JSON dataset (~5.8MB) for instant Vercel Serverless cold starts.
+    Prioritizes reading from local SQLite database (recipes.db).
     """
     if state.is_loaded:
         return
 
-    print("Initializing AI Recipe Builder Backend (Lightweight Serverless Engine)...")
+    print("Initializing AI Recipe Builder Backend (SQLite Engine)...")
 
     raw_data = []
 
-    candidate_csv_paths = [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes.csv")),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes.csv")),
-        os.path.join(os.getcwd(), "api", "recipes.csv"),
-        os.path.join(os.getcwd(), "backend", "recipes.csv"),
+    # 1. Try reading from SQLite database (recipes.db)
+    candidate_db_paths = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes.db")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes.db")),
+        os.path.join(os.getcwd(), "api", "recipes.db"),
+        os.path.join(os.getcwd(), "backend", "recipes.db"),
     ]
 
-    # 1. Try reading recipes.csv (from api/ directory or backend/ directory)
-    for csv_path in candidate_csv_paths:
-        if os.path.exists(csv_path):
+    for db_path in candidate_db_paths:
+        if os.path.exists(db_path):
             try:
-                with open(csv_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    raw_data = list(csv.DictReader(f))
-                    print(f"Loaded {len(raw_data)} recipes from CSV at {csv_path}.")
-                    break
+                conn = sqlite3.connect(db_path)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM recipes ORDER BY id ASC")
+                db_rows = cursor.fetchall()
+                raw_data = [dict(r) for r in db_rows]
+                conn.close()
+                print(f"Loaded {len(raw_data)} recipes from SQLite database at {db_path}.")
+                break
             except Exception as e:
-                print(f"CSV load error for {csv_path}: {e}")
+                print(f"SQLite load error for {db_path}: {e}")
+
+    # 2. Try reading recipes.csv as fallback
+    if not raw_data:
+        candidate_csv_paths = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes.csv")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes.csv")),
+            os.path.join(os.getcwd(), "api", "recipes.csv"),
+            os.path.join(os.getcwd(), "backend", "recipes.csv"),
+        ]
+        for csv_path in candidate_csv_paths:
+            if os.path.exists(csv_path):
+                try:
+                    with open(csv_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        raw_data = list(csv.DictReader(f))
+                        print(f"Loaded {len(raw_data)} recipes from CSV at {csv_path}.")
+                        break
+                except Exception as e:
+                    print(f"CSV load error for {csv_path}: {e}")
 
     # 2. Try compressed JSON.GZ file fallback
     if not raw_data:
@@ -103,11 +128,11 @@ def ensure_state_loaded():
     loaded_by_id = {}
 
     for idx, row in enumerate(raw_data):
-        title = (row.get('Recipe Name') or row.get('name') or 'Untitled Recipe').strip()
-        ing_text = (row.get('Ingredients') or row.get('ing') or '').strip()
-        instructions = (row.get('Instructions') or row.get('inst') or '').strip()
-        cuisine = (row.get('Cuisine') or row.get('cuis') or 'American').strip()
-        meal_type = (row.get('Meal Type') or row.get('meal') or 'Dinner').strip()
+        title = (row.get('Recipe Name') or row.get('recipe_name') or row.get('name') or 'Untitled Recipe').strip()
+        ing_text = (row.get('Ingredients') or row.get('ingredients') or row.get('ing') or '').strip()
+        instructions = (row.get('Instructions') or row.get('instructions') or row.get('inst') or '').strip()
+        cuisine = (row.get('Cuisine') or row.get('cuisine') or row.get('cuis') or 'American').strip()
+        meal_type = (row.get('Meal Type') or row.get('meal_type') or row.get('meal') or 'Dinner').strip()
 
         if ing_text.startswith('[') and ing_text.endswith(']'):
             try:
@@ -120,41 +145,41 @@ def ensure_state_loaded():
             ingredients_list = [i.strip() for i in ing_text.split(',') if i.strip()]
 
         try:
-            prep_val = row.get('Prep Time') if row.get('Prep Time') is not None else row.get('prep', 15)
+            prep_val = row.get('Prep Time') if row.get('Prep Time') is not None else (row.get('prep_time') if row.get('prep_time') is not None else row.get('prep', 15))
             prep_time = int(prep_val if prep_val is not None else 15)
         except (ValueError, TypeError): prep_time = 15
 
         try:
-            cook_val = row.get('Cook Time') if row.get('Cook Time') is not None else row.get('cook', 30)
+            cook_val = row.get('Cook Time') if row.get('Cook Time') is not None else (row.get('cook_time') if row.get('cook_time') is not None else row.get('cook', 30))
             cook_time = int(cook_val if cook_val is not None else 30)
         except (ValueError, TypeError): cook_time = 30
 
         try:
-            cal_val = row.get('Calories') if row.get('Calories') is not None else row.get('cal', 400)
+            cal_val = row.get('Calories') if row.get('Calories') is not None else (row.get('calories') if row.get('calories') is not None else row.get('cal', 400))
             calories = int(cal_val if cal_val is not None else 400)
         except (ValueError, TypeError): calories = 400
 
         try:
-            prot_val = row.get('Protein') if row.get('Protein') is not None else row.get('prot', 20)
+            prot_val = row.get('Protein') if row.get('Protein') is not None else (row.get('protein') if row.get('protein') is not None else row.get('prot', 20))
             protein = int(prot_val if prot_val is not None else 20)
         except (ValueError, TypeError): protein = 20
 
         try:
-            carb_val = row.get('Carbs') if row.get('Carbs') is not None else row.get('carb', 40)
+            carb_val = row.get('Carbs') if row.get('Carbs') is not None else (row.get('carbs') if row.get('carbs') is not None else row.get('carb', 40))
             carbs = int(carb_val if carb_val is not None else 40)
         except (ValueError, TypeError): carbs = 40
 
         try:
-            fat_val = row.get('Fat') if row.get('Fat') is not None else row.get('fat', 15)
+            fat_val = row.get('Fat') if row.get('Fat') is not None else (row.get('fat') if row.get('fat') is not None else 15)
             fat = int(fat_val if fat_val is not None else 15)
         except (ValueError, TypeError): fat = 15
 
         try:
-            serv_val = row.get('Servings') if row.get('Servings') is not None else row.get('serv', 4)
+            serv_val = row.get('Servings') if row.get('Servings') is not None else (row.get('servings') if row.get('servings') is not None else row.get('serv', 4))
             servings = int(serv_val if serv_val is not None else 4)
         except (ValueError, TypeError): servings = 4
 
-        difficulty = (row.get('Difficulty') or row.get('diff') or 'Medium').strip()
+        difficulty = (row.get('Difficulty') or row.get('difficulty') or row.get('diff') or 'Medium').strip()
 
         is_veg = check_vegetarian(ing_text, title)
         is_vgn = check_vegan(ing_text, title)
