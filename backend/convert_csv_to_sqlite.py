@@ -3,6 +3,9 @@ import csv
 import sqlite3
 import shutil
 
+from utils import get_smart_food_image
+from preprocess import check_vegetarian
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH = os.path.join(BASE_DIR, "recipes.csv")
 DB_PATH = os.path.join(BASE_DIR, "recipes.db")
@@ -82,7 +85,8 @@ def convert_csv_to_sqlite():
             try: servings = int(row.get("Servings") or row.get("serv") or 4)
             except (ValueError, TypeError): servings = 4
 
-            image_url = (row.get("Image URL") or "").strip()
+            is_veg = check_vegetarian(ingredients, title)
+            image_url = get_smart_food_image(title, ingredients, cuisine, meal_type, is_veg)
 
             rows_to_insert.append((
                 title, ingredients, instructions, cuisine, meal_type,

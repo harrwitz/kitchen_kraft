@@ -131,6 +131,16 @@ def filter_recipes_dataframe(
     return filtered_indices
 
 FOOD_IMAGES_CATEGORIES = {
+    "cocktails_drinks": [
+        "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1536935338788-846bb9981813?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1556881286-fc6915169721?auto=format&fit=crop&w=800&q=80"
+    ],
+    "smoothie_juice": [
+        "https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1623065422902-30a2d299bbe4?auto=format&fit=crop&w=800&q=80"
+    ],
     "roast_chicken": [
         "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?auto=format&fit=crop&w=800&q=80",
         "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=800&q=80"
@@ -223,8 +233,17 @@ def get_smart_food_image(recipe_name: str, ingredients_text: str, cuisine: str, 
     combined = (name_lower + " " + (ingredients_text or "")).lower()
     name_hash = abs(hash(recipe_name or "food"))
 
-    # Priority matching on specific dish titles first
-    if any(w in name_lower for w in ["roast chicken", "roasted chicken"]):
+    # Priority matching on cocktails & drinks
+    if any(w in name_lower for w in [
+        "alimony", "cocktail", "drink", "beverage", "punch", "sangria", "mojito", "margarita",
+        "martini", "cynar", "sherry", "vermouth", "spritz", "bourbon", "whiskey", "rum", "tequila",
+        "vodka", "brandy", "mocktail", "tonic", "fizz", "highball", "sour", "slushie", "negroni", "manhattan"
+    ]) or any(w in combined for w in ["sherry", "cynar", "dry vermouth", "gin", "bourbon", "tequila", "triple sec", "simple syrup", "angostura"]):
+        pool = FOOD_IMAGES_CATEGORIES["cocktails_drinks"]
+    elif any(w in name_lower for w in ["smoothie", "juice", "lemonade", "shake", "milkshake"]):
+        pool = FOOD_IMAGES_CATEGORIES["smoothie_juice"]
+    # Priority matching on specific dish titles
+    elif any(w in name_lower for w in ["roast chicken", "roasted chicken"]):
         pool = FOOD_IMAGES_CATEGORIES["roast_chicken"]
     elif any(w in name_lower for w in ["squash", "pumpkin"]):
         pool = FOOD_IMAGES_CATEGORIES["squash_pumpkin"]
@@ -264,8 +283,6 @@ def get_smart_food_image(recipe_name: str, ingredients_text: str, cuisine: str, 
         pool = FOOD_IMAGES_CATEGORIES["breakfast_pancakes"]
     elif any(w in name_lower for w in ["pie", "cake", "tart", "brownie", "ice cream", "cookie"]):
         pool = FOOD_IMAGES_CATEGORIES["dessert_pie_cake"]
-    elif any(w in name_lower for w in ["potato", "potatoes", "spud"]):
-        pool = FOOD_IMAGES_CATEGORIES["potato"]
     # Fallback to combined ingredient checking
     elif any(w in combined for w in ["chicken", "poultry"]):
         pool = FOOD_IMAGES_CATEGORIES["chicken"]
