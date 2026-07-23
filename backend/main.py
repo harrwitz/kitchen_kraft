@@ -34,27 +34,42 @@ def ensure_state_loaded():
 
     raw_data = []
 
-    gz_path = os.path.join(os.path.dirname(__file__), "recipes_compact.json.gz")
-    json_path = os.path.join(os.path.dirname(__file__), "recipes_compact.json")
+    candidate_gz_paths = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes_compact.json.gz")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes_compact.json.gz")),
+        os.path.join(os.getcwd(), "api", "recipes_compact.json.gz"),
+        os.path.join(os.getcwd(), "backend", "recipes_compact.json.gz"),
+    ]
 
     # 1. Try compressed JSON.GZ file (~5.8MB, optimal for Vercel)
-    if os.path.exists(gz_path):
-        try:
-            import gzip
-            with gzip.open(gz_path, 'rt', encoding='utf-8') as f:
-                raw_data = json.load(f)
-                print(f"Loaded {len(raw_data)} recipes from {gz_path}.")
-        except Exception as e:
-            print(f"GZ load error: {e}")
+    for gz_path in candidate_gz_paths:
+        if os.path.exists(gz_path):
+            try:
+                import gzip
+                with gzip.open(gz_path, 'rt', encoding='utf-8') as f:
+                    raw_data = json.load(f)
+                    print(f"Loaded {len(raw_data)} recipes from {gz_path}.")
+                    break
+            except Exception as e:
+                print(f"GZ load error for {gz_path}: {e}")
 
     # 2. Try JSON file fallback
-    if not raw_data and os.path.exists(json_path):
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                raw_data = json.load(f)
-                print(f"Loaded {len(raw_data)} recipes from {json_path}.")
-        except Exception as e:
-            print(f"JSON load error: {e}")
+    candidate_json_paths = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes_compact.json")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes_compact.json")),
+        os.path.join(os.getcwd(), "api", "recipes_compact.json"),
+        os.path.join(os.getcwd(), "backend", "recipes_compact.json"),
+    ]
+    if not raw_data:
+        for json_path in candidate_json_paths:
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        raw_data = json.load(f)
+                        print(f"Loaded {len(raw_data)} recipes from {json_path}.")
+                        break
+                except Exception as e:
+                    print(f"JSON load error for {json_path}: {e}")
 
     # 3. Try CSV file fallback
     if not raw_data and os.path.exists(CSV_PATH):
@@ -162,13 +177,23 @@ def ensure_state_loaded():
     state.recipes = loaded_recipes
     state.recipes_by_id = loaded_by_id
 
-    if os.path.exists(UNIQUE_INGREDIENTS_PATH):
-        try:
-            with open(UNIQUE_INGREDIENTS_PATH, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                state.unique_ingredients = data.get("ingredients", [])
-        except Exception as e:
-            print(f"Warning loading unique_ingredients.json: {e}")
+    candidate_ing_paths = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "unique_ingredients.json")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "unique_ingredients.json")),
+        os.path.join(os.getcwd(), "api", "unique_ingredients.json"),
+        os.path.join(os.getcwd(), "backend", "unique_ingredients.json"),
+    ]
+
+    for ing_path in candidate_ing_paths:
+        if os.path.exists(ing_path):
+            try:
+                with open(ing_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    state.unique_ingredients = data.get("ingredients", [])
+                    print(f"Loaded {len(state.unique_ingredients)} unique ingredients from {ing_path}.")
+                    break
+            except Exception as e:
+                print(f"Warning loading unique_ingredients.json from {ing_path}: {e}")
 
     state.is_loaded = True
     print(f"Loaded {len(state.recipes)} recipes into RAM.")
