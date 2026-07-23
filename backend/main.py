@@ -233,14 +233,13 @@ async def fix_vercel_path(request, call_next):
     headers = request.headers
     matched = headers.get("x-matched-path") or headers.get("x-invoke-path") or headers.get("x-forwarded-uri") or headers.get("x-url")
 
-    if path.startswith("/api/index.py"):
-        sub = path.replace("/api/index.py", "")
-        if sub and sub != "/":
-            request.scope["path"] = sub if sub.startswith("/api") else f"/api{sub}"
-        elif matched and not matched.startswith("/api/index.py"):
+    if path in ["/api", "/api/"] or path.startswith("/api/index.py"):
+        if matched and matched not in ["/", "/api", "/api/index.py"]:
             request.scope["path"] = matched if matched.startswith("/api") else f"/api{matched}"
-        else:
-            request.scope["path"] = "/api"
+        elif path.startswith("/api/index.py"):
+            sub = path.replace("/api/index.py", "")
+            if sub and sub != "/":
+                request.scope["path"] = sub if sub.startswith("/api") else f"/api{sub}"
 
     return await call_next(request)
 
