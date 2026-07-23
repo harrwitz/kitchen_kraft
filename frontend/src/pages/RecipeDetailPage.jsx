@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Clock, Flame, Utensils, ChefHat, Users, CheckCircle2, Circle, ArrowLeft, Sparkles, Printer, Leaf } from 'lucide-react';
+import { Clock, Flame, Utensils, ChefHat, Users, CheckCircle2, Circle, ArrowLeft, Sparkles, Printer, Leaf, CircleDot } from 'lucide-react';
 import NutritionBadge from '../components/NutritionBadge';
 import ServingScaler from '../components/ServingScaler';
 import RecipeCard from '../components/RecipeCard';
@@ -105,36 +105,37 @@ export default function RecipeDetailPage() {
         {/* Top Badges */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#F4EFE6] text-[#244235] border border-[#E5DCCB]">
-              <Utensils className="w-3.5 h-3.5 text-[#244235]" />
-              {recipe.cuisine} Cuisine
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#FDF4E7] text-[#9A4918] border border-[#F6D9B6]">
-              <ChefHat className="w-3.5 h-3.5 text-[#9A4918]" />
-              {recipe.meal_type}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
+            {recipe.is_vegetarian ? (
+              <span className="px-3.5 py-1.5 rounded-full bg-[#DCFCE7] text-[#15803D] border border-[#86EFAC] text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                <Leaf className="w-3.5 h-3.5 text-[#15803D]" /> Vegetarian
+              </span>
+            ) : (
+              <span className="px-3.5 py-1.5 rounded-full bg-[#FEE2E2] text-[#B91C1C] border border-[#FCA5A5] text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                <CircleDot className="w-3.5 h-3.5 text-[#B91C1C]" /> Non-Veg
+              </span>
+            )}
             <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#FAF7F2] text-[#231F1D] border border-[#E3DAC9]">
               {recipe.difficulty} Difficulty
             </span>
-            {recipe.is_vegan ? (
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#F4EFE6] text-[#244235] border border-[#E5DCCB] flex items-center gap-1">
-                <Leaf className="w-3.5 h-3.5 text-[#244235]" /> Vegan
-              </span>
-            ) : recipe.is_vegetarian ? (
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#F4EFE6] text-[#244235] border border-[#E5DCCB] flex items-center gap-1">
-                <Leaf className="w-3.5 h-3.5 text-[#244235]" /> Vegetarian
-              </span>
-            ) : null}
           </div>
+
+          <span className="px-3.5 py-1.5 rounded-full text-xs font-bold border shadow-2xs bg-[#FDF4E7] text-[#9A4918] border-[#F6D9B6]">
+            {recipe.meal_type || 'Dinner'}
+          </span>
         </div>
 
         {/* Title */}
         <h1 className="text-3xl sm:text-5xl font-bold font-serif-warm text-[#231F1D] leading-tight">
           {recipe.recipe_name}
         </h1>
+
+        {/* Cuisine Badge (Positioned BELOW Title) */}
+        <div>
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#F4EFE6] text-[#244235] border border-[#E5DCCB] text-xs font-bold">
+            <Utensils className="w-3.5 h-3.5 text-[#244235]" />
+            {recipe.cuisine} Cuisine
+          </span>
+        </div>
 
         {/* Key Metrics Strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#EAE3D2] bg-[#FAF7F2] p-4 border-t border-[#E3DAC9] text-center">
