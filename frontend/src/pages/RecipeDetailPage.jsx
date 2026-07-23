@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Clock, Flame, Utensils, ChefHat, Users, CheckCircle2, Circle, ArrowLeft, Sparkles, Printer, Leaf, CircleDot } from 'lucide-react';
+import { Clock, Flame, Utensils, ChefHat, Users, CheckCircle2, Circle, ArrowLeft, Sparkles, Printer, Leaf, CircleDot, Wine, GlassWater } from 'lucide-react';
 import NutritionBadge from '../components/NutritionBadge';
 import ServingScaler from '../components/ServingScaler';
 import RecipeCard from '../components/RecipeCard';
@@ -119,9 +119,23 @@ export default function RecipeDetailPage() {
             </span>
           </div>
 
-          <span className="px-3.5 py-1.5 rounded-full text-xs font-bold border shadow-2xs bg-[#FDF4E7] text-[#9A4918] border-[#F6D9B6]">
-            {recipe.meal_type || 'Dinner'}
-          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {recipe.meal_type === 'Beverage' || recipe.is_beverage ? (
+              recipe.is_alcoholic ? (
+                <span className="px-3.5 py-1.5 rounded-full text-xs font-bold border shadow-2xs bg-[#FEF2F2] text-[#991B1B] border-[#FCA5A5] flex items-center gap-1.5">
+                  <Wine className="w-3.5 h-3.5 text-[#991B1B]" /> Alcoholic Beverage
+                </span>
+              ) : (
+                <span className="px-3.5 py-1.5 rounded-full text-xs font-bold border shadow-2xs bg-[#F0F9FF] text-[#0369A1] border-[#BAE6FD] flex items-center gap-1.5">
+                  <GlassWater className="w-3.5 h-3.5 text-[#0369A1]" /> Non-Alcoholic Beverage
+                </span>
+              )
+            ) : (
+              <span className="px-3.5 py-1.5 rounded-full text-xs font-bold border shadow-2xs bg-[#FDF4E7] text-[#9A4918] border-[#F6D9B6]">
+                {recipe.meal_type || 'Dinner'}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Title */}

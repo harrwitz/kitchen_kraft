@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 
 from preprocess import clean_text, check_vegetarian, check_vegan
-from utils import calculate_recipe_budget, get_smart_food_image
+from utils import calculate_recipe_budget, get_smart_food_image, sanitize_meal_and_alcohol
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "recipes.db")
 CSV_PATH = os.path.join(os.path.dirname(__file__), "recipes.csv")
@@ -183,8 +183,8 @@ def ensure_state_loaded():
 
         is_veg = check_vegetarian(ing_text, title)
         is_vgn = check_vegan(ing_text, title)
+        meal_type, is_bev, is_alc = sanitize_meal_and_alcohol(title, ing_text, meal_type)
         budget_info = calculate_recipe_budget(row)
-        smart_image = get_smart_food_image(title, ing_text, cuisine, meal_type, is_veg)
 
         item = {
             "id": idx,
@@ -203,9 +203,11 @@ def ensure_state_loaded():
             "fat": fat,
             "difficulty": difficulty,
             "servings": servings,
-            "image_url": smart_image,
+            "image_url": "",
             "is_vegetarian": is_veg,
             "is_vegan": is_vgn,
+            "is_beverage": is_bev,
+            "is_alcoholic": is_alc,
             "is_budget": budget_info["is_budget"],
             "budget_tier": budget_info["budget_tier"],
             "budget_symbol": budget_info["budget_symbol"],

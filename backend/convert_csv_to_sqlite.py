@@ -3,7 +3,7 @@ import csv
 import sqlite3
 import shutil
 
-from utils import get_smart_food_image
+from utils import get_smart_food_image, sanitize_meal_and_alcohol
 from preprocess import check_vegetarian
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -70,7 +70,9 @@ def convert_csv_to_sqlite():
         fat INTEGER,
         difficulty TEXT,
         servings INTEGER,
-        image_url TEXT
+        image_url TEXT,
+        is_beverage INTEGER DEFAULT 0,
+        is_alcoholic INTEGER DEFAULT 0
     );
     """)
 
@@ -82,7 +84,9 @@ def convert_csv_to_sqlite():
             ingredients = (row.get("Ingredients") or row.get("ing") or "").strip()
             instructions = (row.get("Instructions") or row.get("inst") or "").strip()
             cuisine = (row.get("Cuisine") or row.get("cuis") or "American").strip()
-            meal_type = (row.get("Meal Type") or row.get("meal") or "Dinner").strip()
+            raw_meal = (row.get("Meal Type") or row.get("meal") or "Dinner").strip()
+
+            meal_type, is_bev, is_alc = sanitize_meal_and_alcohol(title, ingredients, raw_meal)
 
             raw_prep = row.get("Prep Time") or row.get("prep") or 15
             raw_cook = row.get("Cook Time") or row.get("cook") or 30
@@ -107,20 +111,19 @@ def convert_csv_to_sqlite():
             except (ValueError, TypeError): servings = 4
 
             is_veg = check_vegetarian(ingredients, title)
-            image_url = get_smart_food_image(title, ingredients, cuisine, meal_type, is_veg)
 
             rows_to_insert.append((
                 title, ingredients, instructions, cuisine, meal_type,
                 prep_time, cook_time, calories, protein, carbs, fat,
-                difficulty, servings, image_url
+                difficulty, servings, "", 1 if is_bev else 0, 1 if is_alc else 0
             ))
 
     cursor.executemany("""
     INSERT INTO recipes (
         recipe_name, ingredients, instructions, cuisine, meal_type,
         prep_time, cook_time, calories, protein, carbs, fat,
-        difficulty, servings, image_url
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        difficulty, servings, image_url, is_beverage, is_alcoholic
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """, rows_to_insert)
 
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_recipes_cuisine ON recipes(cuisine);")

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, Flame, Utensils, ArrowRight, Leaf, Sparkles, CircleDot } from 'lucide-react';
+import { Clock, Flame, Utensils, ArrowRight, Leaf, Sparkles, CircleDot, Wine, GlassWater } from 'lucide-react';
 
 export default function RecipeCard({ recipe }) {
   if (!recipe) return null;
@@ -19,14 +19,25 @@ export default function RecipeCard({ recipe }) {
 
   const totalTime = (recipe.prep_time || 15) + (recipe.cook_time || 25);
   
-  // Strict check for actual budget friendly recipes
-  const isBudget = recipe.is_budget === true || (typeof recipe.cost_per_serving === 'number' && recipe.cost_per_serving <= 2.75);
+  // Strict check for actual budget friendly recipes ($1.65 per serving threshold)
+  const isBudget = recipe.is_budget === true || (typeof recipe.cost_per_serving === 'number' && recipe.cost_per_serving <= 1.65);
+
+  // Alcohol check for beverages
+  const titleLower = (recipe.recipe_name || '').toLowerCase();
+  const rawIng = (recipe.raw_ingredients || recipe.ingredients || '').toString().toLowerCase();
+  const combined = titleLower + ' ' + rawIng;
+
+  const ALCOHOL_WORDS = ['bourbon', 'whiskey', 'whisky', 'rum', 'tequila', 'vodka', 'gin', 'brandy', 'wine', 'vermouth', 'cynar', 'triple sec', 'liquor', 'liqueur', 'sazerac', 'negroni', 'manhattan', 'margarita', 'mojito', 'martini', 'sangria', 'spritz', 'ale', 'beer', 'champagne', 'prosecco', 'cognac', 'mezcal', 'sherry', 'campari', 'aperol', 'absinthe', 'kahlua', 'amaretto', 'sake', 'cider', 'cocktail', 'toddy'];
+
+  const isBeverage = mealType === 'Beverage' || recipe.is_beverage === true || ['cocktail', 'smoothie', 'juice', 'lemonade', 'shake', 'toddy', 'punch', 'spritz', 'mocktail', 'latte', 'espresso', 'margarita', 'mojito', 'sangria', 'alimony'].some(k => titleLower.includes(k));
+
+  const isAlcoholic = recipe.is_alcoholic === true || (isBeverage && ALCOHOL_WORDS.some(k => combined.includes(k)) && !['non-alcoholic', 'zero-proof', 'virgin', 'mocktail'].some(k => combined.includes(k)));
 
   return (
     <div className="group bg-white rounded-2xl overflow-hidden flex flex-col justify-between transition-all duration-300 hover:-translate-y-1.5 border border-[#E3DAC9] p-6 shadow-xs hover:shadow-md hover:border-[#244235] relative">
       <div className="space-y-4">
         
-        {/* Fixed Top Row: Green Vegetarian OR Red Non-Veg Badge on Left, Color-coded Meal Type Badge on Right */}
+        {/* Fixed Top Row: Green Vegetarian OR Red Non-Veg Badge on Left, Meal Type OR Alcohol Badge on Right */}
         <div className="flex items-center justify-between gap-2 w-full">
           {recipe.is_vegetarian ? (
             <span className="px-2.5 py-1 rounded-full bg-[#DCFCE7] text-[#15803D] border border-[#86EFAC] text-xs font-bold flex items-center gap-1.5 shadow-2xs">
@@ -40,9 +51,24 @@ export default function RecipeCard({ recipe }) {
             </span>
           )}
 
-          <span className={`px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${mealBadgeColor}`}>
-            {mealType}
-          </span>
+          {/* Right Badge: If Beverage, render Alcoholic or Non-Alcoholic badge; otherwise Meal Type */}
+          {isBeverage ? (
+            isAlcoholic ? (
+              <span className="px-3 py-1 rounded-full text-xs font-bold border shadow-2xs bg-[#FEF2F2] text-[#991B1B] border-[#FCA5A5] flex items-center gap-1">
+                <Wine className="w-3.5 h-3.5 text-[#991B1B]" />
+                <span>Alcoholic</span>
+              </span>
+            ) : (
+              <span className="px-3 py-1 rounded-full text-xs font-bold border shadow-2xs bg-[#F0F9FF] text-[#0369A1] border-[#BAE6FD] flex items-center gap-1">
+                <GlassWater className="w-3.5 h-3.5 text-[#0369A1]" />
+                <span>Non-Alcoholic</span>
+              </span>
+            )
+          ) : (
+            <span className={`px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${mealBadgeColor}`}>
+              {mealType}
+            </span>
+          )}
         </div>
 
         {/* Recipe Title (Full text without truncation) */}
