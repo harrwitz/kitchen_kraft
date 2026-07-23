@@ -197,16 +197,16 @@ app.add_middleware(
 async def fix_vercel_path(request, call_next):
     path = request.scope.get("path", "")
     headers = request.headers
-    matched = headers.get("x-matched-path") or headers.get("x-invoke-path") or headers.get("x-forwarded-uri")
+    matched = headers.get("x-matched-path") or headers.get("x-invoke-path") or headers.get("x-forwarded-uri") or headers.get("x-url")
 
     if path.startswith("/api/index.py"):
         sub = path.replace("/api/index.py", "")
         if sub and sub != "/":
-            request.scope["path"] = sub
+            request.scope["path"] = sub if sub.startswith("/api") else f"/api{sub}"
         elif matched and not matched.startswith("/api/index.py"):
-            request.scope["path"] = matched
+            request.scope["path"] = matched if matched.startswith("/api") else f"/api{matched}"
         else:
-            request.scope["path"] = "/"
+            request.scope["path"] = "/api"
 
     return await call_next(request)
 

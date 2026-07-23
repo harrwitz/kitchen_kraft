@@ -3,7 +3,7 @@
   "outputDirectory": "frontend/dist",
   "rewrites": [
     {
-      "source": "/(recipes|recipe/.*|search|recommend|cuisines|meal-types|ingredients/.*)",
+      "source": "/api/(.*)",
       "destination": "/api/index.py"
     },
     {
