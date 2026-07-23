@@ -100,54 +100,41 @@ export default function RecipeDetailPage() {
         </div>
       </div>
 
-      {/* Hero Showcase Card */}
-      <div className="bg-white rounded-3xl overflow-hidden border border-[#E3DAC9] shadow-xs relative">
-        <div className="relative h-72 sm:h-96 w-full bg-[#FAF7F2]">
-          <img
-            src={recipe.image_url || "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=1200&q=80"}
-            alt={recipe.recipe_name}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.target.src = "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=1200&q=80";
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#231F1D]/80 via-[#231F1D]/30 to-transparent" />
-
-          {/* Top Badges */}
-          <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold bg-white/95 backdrop-blur-md text-[#231F1D] border border-[#E3DAC9] shadow-xs">
+      {/* Hero Showcase Header Banner */}
+      <div className="bg-white rounded-3xl overflow-hidden border border-[#E3DAC9] p-8 sm:p-12 shadow-xs relative space-y-6">
+        {/* Top Badges */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#F4EFE6] text-[#244235] border border-[#E5DCCB]">
               <Utensils className="w-3.5 h-3.5 text-[#244235]" />
               {recipe.cuisine} Cuisine
             </span>
-
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold bg-[#F4EFE6] text-[#244235] border border-[#E3DAC9] backdrop-blur-xs">
-              <ChefHat className="w-3.5 h-3.5 text-[#244235]" />
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#FDF4E7] text-[#9A4918] border border-[#F6D9B6]">
+              <ChefHat className="w-3.5 h-3.5 text-[#9A4918]" />
               {recipe.meal_type}
             </span>
           </div>
 
-          {/* Title overlay */}
-          <div className="absolute bottom-6 left-6 right-6 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/95 text-[#231F1D] border border-[#E3DAC9]">
-                {recipe.difficulty} Difficulty
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#FAF7F2] text-[#231F1D] border border-[#E3DAC9]">
+              {recipe.difficulty} Difficulty
+            </span>
+            {recipe.is_vegan ? (
+              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#F4EFE6] text-[#244235] border border-[#E5DCCB] flex items-center gap-1">
+                <Leaf className="w-3.5 h-3.5 text-[#244235]" /> Vegan
               </span>
-              {recipe.is_vegan ? (
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#F4EFE6] text-[#244235] border border-[#E3DAC9] flex items-center gap-1">
-                  <Leaf className="w-3 h-3 text-[#244235]" /> Vegan
-                </span>
-              ) : recipe.is_vegetarian ? (
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#F4EFE6] text-[#244235] border border-[#E3DAC9] flex items-center gap-1">
-                  <Leaf className="w-3 h-3 text-[#244235]" /> Vegetarian
-                </span>
-              ) : null}
-            </div>
-
-            <h1 className="text-2xl sm:text-4xl font-bold font-serif-warm text-white tracking-tight leading-tight">
-              {recipe.recipe_name}
-            </h1>
+            ) : recipe.is_vegetarian ? (
+              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#F4EFE6] text-[#244235] border border-[#E5DCCB] flex items-center gap-1">
+                <Leaf className="w-3.5 h-3.5 text-[#244235]" /> Vegetarian
+              </span>
+            ) : null}
           </div>
         </div>
+
+        {/* Title */}
+        <h1 className="text-3xl sm:text-5xl font-bold font-serif-warm text-[#231F1D] leading-tight">
+          {recipe.recipe_name}
+        </h1>
 
         {/* Key Metrics Strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#EAE3D2] bg-[#FAF7F2] p-4 border-t border-[#E3DAC9] text-center">

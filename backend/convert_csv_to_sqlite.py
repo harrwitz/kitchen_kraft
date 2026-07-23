@@ -11,6 +11,28 @@ CSV_PATH = os.path.join(BASE_DIR, "recipes.csv")
 DB_PATH = os.path.join(BASE_DIR, "recipes.db")
 API_DB_PATH = os.path.abspath(os.path.join(BASE_DIR, "..", "api", "recipes.db"))
 
+def sanitize_times(prep_raw, cook_raw, title, instructions):
+    try: prep = int(prep_raw)
+    except Exception: prep = 15
+    if prep <= 0 or prep > 45: prep = 15
+
+    try: cook = int(cook_raw)
+    except Exception: cook = 25
+
+    title_lower = (title or '').lower()
+    inst_lower = (instructions or '').lower()
+
+    if cook > 90:
+        if 'roast chicken' in title_lower or 'whole chicken' in inst_lower: cook = 45
+        elif 'stew' in title_lower or 'roast' in title_lower: cook = 50
+        elif 'casserole' in title_lower or 'gratin' in title_lower: cook = 35
+        elif 'soup' in title_lower or 'dal' in title_lower: cook = 30
+        elif 'cocktail' in title_lower or 'drink' in title_lower or 'beverage' in title_lower: cook = 0; prep = 10
+        elif 'salad' in title_lower: cook = 0; prep = 15
+        else: cook = min(cook % 45 + 20, 45)
+
+    return prep, cook
+
 def convert_csv_to_sqlite():
     if not os.path.exists(CSV_PATH):
         alt_csv = os.path.abspath(os.path.join(BASE_DIR, "..", "api", "recipes.csv"))
@@ -62,11 +84,10 @@ def convert_csv_to_sqlite():
             cuisine = (row.get("Cuisine") or row.get("cuis") or "American").strip()
             meal_type = (row.get("Meal Type") or row.get("meal") or "Dinner").strip()
 
-            try: prep_time = int(row.get("Prep Time") or row.get("prep") or 15)
-            except (ValueError, TypeError): prep_time = 15
-
-            try: cook_time = int(row.get("Cook Time") or row.get("cook") or 30)
-            except (ValueError, TypeError): cook_time = 30
+            raw_prep = row.get("Prep Time") or row.get("prep") or 15
+            raw_cook = row.get("Cook Time") or row.get("cook") or 30
+            
+            prep_time, cook_time = sanitize_times(raw_prep, raw_cook, title, instructions)
 
             try: calories = int(row.get("Calories") or row.get("cal") or 400)
             except (ValueError, TypeError): calories = 400
