@@ -53,14 +53,14 @@ export default function SearchPage() {
         if (query.trim()) {
           const res = await searchRecipes({
             query: query.trim(),
-            cuisine: filters.cuisine !== 'All' ? filters.cuisine : None,
-            meal_type: filters.meal_type !== 'All' ? filters.meal_type : None,
-            is_vegetarian: filters.is_vegetarian || None,
-            is_vegan: filters.is_vegan || None,
-            max_calories: filters.max_calories || None,
-            max_cook_time: filters.max_cook_time || None,
-            difficulty: filters.difficulty !== 'All' ? filters.difficulty : None,
-            min_protein: filters.min_protein || None,
+            cuisine: filters.cuisine !== 'All' ? filters.cuisine : undefined,
+            meal_type: filters.meal_type !== 'All' ? filters.meal_type : undefined,
+            is_vegetarian: filters.is_vegetarian || undefined,
+            is_vegan: filters.is_vegan || undefined,
+            max_calories: filters.max_calories || undefined,
+            max_cook_time: filters.max_cook_time || undefined,
+            difficulty: filters.difficulty !== 'All' ? filters.difficulty : undefined,
+            min_protein: filters.min_protein || undefined,
             limit: 12
           });
           setRecipes(res.recipes || []);
@@ -70,14 +70,14 @@ export default function SearchPage() {
           const res = await getRecipes({
             page,
             limit: 12,
-            cuisine: filters.cuisine !== 'All' ? filters.cuisine : None,
-            meal_type: filters.meal_type !== 'All' ? filters.meal_type : None,
-            is_vegetarian: filters.is_vegetarian || None,
-            is_vegan: filters.is_vegan || None,
-            max_calories: filters.max_calories || None,
-            max_cook_time: filters.max_cook_time || None,
-            difficulty: filters.difficulty !== 'All' ? filters.difficulty : None,
-            min_protein: filters.min_protein || None,
+            cuisine: filters.cuisine !== 'All' ? filters.cuisine : undefined,
+            meal_type: filters.meal_type !== 'All' ? filters.meal_type : undefined,
+            is_vegetarian: filters.is_vegetarian || undefined,
+            is_vegan: filters.is_vegan || undefined,
+            max_calories: filters.max_calories || undefined,
+            max_cook_time: filters.max_cook_time || undefined,
+            difficulty: filters.difficulty !== 'All' ? filters.difficulty : undefined,
+            min_protein: filters.min_protein || undefined,
             sort_by: sortBy
           });
           setRecipes(res.recipes || []);

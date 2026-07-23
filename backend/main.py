@@ -25,7 +25,7 @@ state = AppState()
 def ensure_state_loaded():
     """
     Fast, lightweight, zero-heavy-dependency state loader.
-    Supports bundled Python module import for Vercel NFT serverless bundling.
+    Supports gzipped compact JSON dataset (~5.8MB) for instant Vercel Serverless cold starts.
     """
     if state.is_loaded:
         return
@@ -34,15 +34,29 @@ def ensure_state_loaded():
 
     raw_data = []
 
-    # 1. Try Python Module Import (Vercel NFT Auto-Bundled)
-    try:
-        from recipes_data import RECIPES_DATA
-        raw_data = RECIPES_DATA
-        print(f"Loaded {len(raw_data)} recipes from bundled recipes_data module.")
-    except Exception as e:
-        print(f"Module import fallback, trying CSV: {e}")
+    gz_path = os.path.join(os.path.dirname(__file__), "recipes_compact.json.gz")
+    json_path = os.path.join(os.path.dirname(__file__), "recipes_compact.json")
 
-    # 2. Try CSV file fallback
+    # 1. Try compressed JSON.GZ file (~5.8MB, optimal for Vercel)
+    if os.path.exists(gz_path):
+        try:
+            import gzip
+            with gzip.open(gz_path, 'rt', encoding='utf-8') as f:
+                raw_data = json.load(f)
+                print(f"Loaded {len(raw_data)} recipes from {gz_path}.")
+        except Exception as e:
+            print(f"GZ load error: {e}")
+
+    # 2. Try JSON file fallback
+    if not raw_data and os.path.exists(json_path):
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                raw_data = json.load(f)
+                print(f"Loaded {len(raw_data)} recipes from {json_path}.")
+        except Exception as e:
+            print(f"JSON load error: {e}")
+
+    # 3. Try CSV file fallback
     if not raw_data and os.path.exists(CSV_PATH):
         try:
             with open(CSV_PATH, 'r', encoding='utf-8', errors='ignore') as f:
@@ -58,11 +72,11 @@ def ensure_state_loaded():
     loaded_by_id = {}
 
     for idx, row in enumerate(raw_data):
-        title = (row.get('Recipe Name') or 'Untitled Recipe').strip()
-        ing_text = (row.get('Ingredients') or '').strip()
-        instructions = (row.get('Instructions') or '').strip()
-        cuisine = (row.get('Cuisine') or 'American').strip()
-        meal_type = (row.get('Meal Type') or 'Dinner').strip()
+        title = (row.get('Recipe Name') or row.get('name') or 'Untitled Recipe').strip()
+        ing_text = (row.get('Ingredients') or row.get('ing') or '').strip()
+        instructions = (row.get('Instructions') or row.get('inst') or '').strip()
+        cuisine = (row.get('Cuisine') or row.get('cuis') or 'American').strip()
+        meal_type = (row.get('Meal Type') or row.get('meal') or 'Dinner').strip()
 
         if ing_text.startswith('[') and ing_text.endswith(']'):
             try:
@@ -74,28 +88,42 @@ def ensure_state_loaded():
         else:
             ingredients_list = [i.strip() for i in ing_text.split(',') if i.strip()]
 
-        try: prep_time = int(row.get('Prep Time') or 15)
-        except ValueError: prep_time = 15
+        try:
+            prep_val = row.get('Prep Time') if row.get('Prep Time') is not None else row.get('prep', 15)
+            prep_time = int(prep_val if prep_val is not None else 15)
+        except (ValueError, TypeError): prep_time = 15
 
-        try: cook_time = int(row.get('Cook Time') or 30)
-        except ValueError: cook_time = 30
+        try:
+            cook_val = row.get('Cook Time') if row.get('Cook Time') is not None else row.get('cook', 30)
+            cook_time = int(cook_val if cook_val is not None else 30)
+        except (ValueError, TypeError): cook_time = 30
 
-        try: calories = int(row.get('Calories') or 400)
-        except ValueError: calories = 400
+        try:
+            cal_val = row.get('Calories') if row.get('Calories') is not None else row.get('cal', 400)
+            calories = int(cal_val if cal_val is not None else 400)
+        except (ValueError, TypeError): calories = 400
 
-        try: protein = int(row.get('Protein') or 20)
-        except ValueError: protein = 20
+        try:
+            prot_val = row.get('Protein') if row.get('Protein') is not None else row.get('prot', 20)
+            protein = int(prot_val if prot_val is not None else 20)
+        except (ValueError, TypeError): protein = 20
 
-        try: carbs = int(row.get('Carbs') or 40)
-        except ValueError: carbs = 40
+        try:
+            carb_val = row.get('Carbs') if row.get('Carbs') is not None else row.get('carb', 40)
+            carbs = int(carb_val if carb_val is not None else 40)
+        except (ValueError, TypeError): carbs = 40
 
-        try: fat = int(row.get('Fat') or 15)
-        except ValueError: fat = 15
+        try:
+            fat_val = row.get('Fat') if row.get('Fat') is not None else row.get('fat', 15)
+            fat = int(fat_val if fat_val is not None else 15)
+        except (ValueError, TypeError): fat = 15
 
-        try: servings = int(row.get('Servings') or 4)
-        except ValueError: servings = 4
+        try:
+            serv_val = row.get('Servings') if row.get('Servings') is not None else row.get('serv', 4)
+            servings = int(serv_val if serv_val is not None else 4)
+        except (ValueError, TypeError): servings = 4
 
-        difficulty = (row.get('Difficulty') or 'Medium').strip()
+        difficulty = (row.get('Difficulty') or row.get('diff') or 'Medium').strip()
 
         is_veg = check_vegetarian(ing_text, title)
         is_vgn = check_vegan(ing_text, title)
@@ -168,12 +196,18 @@ app.add_middleware(
 @app.middleware("http")
 async def fix_vercel_path(request, call_next):
     path = request.scope.get("path", "")
+    headers = request.headers
+    matched = headers.get("x-matched-path") or headers.get("x-invoke-path") or headers.get("x-forwarded-uri")
+
     if path.startswith("/api/index.py"):
-        new_path = path.replace("/api/index.py", "") or "/"
-        request.scope["path"] = new_path
-    elif path.startswith("/api/") and not path.startswith("/api/ingredients"):
-        new_path = path[4:] or "/"
-        request.scope["path"] = new_path
+        sub = path.replace("/api/index.py", "")
+        if sub and sub != "/":
+            request.scope["path"] = sub
+        elif matched and not matched.startswith("/api/index.py"):
+            request.scope["path"] = matched
+        else:
+            request.scope["path"] = "/"
+
     return await call_next(request)
 
 INGREDIENT_EXPANSIONS = {

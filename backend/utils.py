@@ -19,8 +19,13 @@ def calculate_recipe_budget(row: pd.Series) -> dict:
     """
     Calculates estimated cost per serving and budget tier based on ingredients and servings.
     """
-    ing_text = str(row.get('Ingredients', '')).lower()
-    servings = int(row.get('Servings', 4))
+    ing_val = row.get('Ingredients') if row.get('Ingredients') is not None else row.get('ing', '')
+    ing_text = str(ing_val or '').lower()
+    try:
+        serv_val = row.get('Servings') if row.get('Servings') is not None else row.get('serv', 4)
+        servings = int(serv_val or 4)
+    except (ValueError, TypeError):
+        servings = 4
     if servings <= 0:
         servings = 4
 
