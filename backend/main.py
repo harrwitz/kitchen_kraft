@@ -534,7 +534,6 @@ def recommend_similar_items(recipe_id: int, candidates: List[dict], top_n: int =
 
 # --- ENDPOINTS ---
 
-@app.get("/")
 @app.get("/api")
 def get_root():
     ensure_state_loaded()
