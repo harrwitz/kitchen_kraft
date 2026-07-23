@@ -34,33 +34,51 @@ def ensure_state_loaded():
 
     raw_data = []
 
-    candidate_gz_paths = [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes_compact.json.gz")),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes_compact.json.gz")),
-        os.path.join(os.getcwd(), "api", "recipes_compact.json.gz"),
-        os.path.join(os.getcwd(), "backend", "recipes_compact.json.gz"),
+    candidate_csv_paths = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes.csv")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes.csv")),
+        os.path.join(os.getcwd(), "api", "recipes.csv"),
+        os.path.join(os.getcwd(), "backend", "recipes.csv"),
     ]
 
-    # 1. Try compressed JSON.GZ file (~5.8MB, optimal for Vercel)
-    for gz_path in candidate_gz_paths:
-        if os.path.exists(gz_path):
+    # 1. Try reading recipes.csv (from api/ directory or backend/ directory)
+    for csv_path in candidate_csv_paths:
+        if os.path.exists(csv_path):
             try:
-                import gzip
-                with gzip.open(gz_path, 'rt', encoding='utf-8') as f:
-                    raw_data = json.load(f)
-                    print(f"Loaded {len(raw_data)} recipes from {gz_path}.")
+                with open(csv_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    raw_data = list(csv.DictReader(f))
+                    print(f"Loaded {len(raw_data)} recipes from CSV at {csv_path}.")
                     break
             except Exception as e:
-                print(f"GZ load error for {gz_path}: {e}")
+                print(f"CSV load error for {csv_path}: {e}")
 
-    # 2. Try JSON file fallback
-    candidate_json_paths = [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes_compact.json")),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes_compact.json")),
-        os.path.join(os.getcwd(), "api", "recipes_compact.json"),
-        os.path.join(os.getcwd(), "backend", "recipes_compact.json"),
-    ]
+    # 2. Try compressed JSON.GZ file fallback
     if not raw_data:
+        candidate_gz_paths = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes_compact.json.gz")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes_compact.json.gz")),
+            os.path.join(os.getcwd(), "api", "recipes_compact.json.gz"),
+            os.path.join(os.getcwd(), "backend", "recipes_compact.json.gz"),
+        ]
+        for gz_path in candidate_gz_paths:
+            if os.path.exists(gz_path):
+                try:
+                    import gzip
+                    with gzip.open(gz_path, 'rt', encoding='utf-8') as f:
+                        raw_data = json.load(f)
+                        print(f"Loaded {len(raw_data)} recipes from {gz_path}.")
+                        break
+                except Exception as e:
+                    print(f"GZ load error for {gz_path}: {e}")
+
+    # 3. Try JSON file fallback
+    if not raw_data:
+        candidate_json_paths = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes_compact.json")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes_compact.json")),
+            os.path.join(os.getcwd(), "api", "recipes_compact.json"),
+            os.path.join(os.getcwd(), "backend", "recipes_compact.json"),
+        ]
         for json_path in candidate_json_paths:
             if os.path.exists(json_path):
                 try:
@@ -70,15 +88,6 @@ def ensure_state_loaded():
                         break
                 except Exception as e:
                     print(f"JSON load error for {json_path}: {e}")
-
-    # 3. Try CSV file fallback
-    if not raw_data and os.path.exists(CSV_PATH):
-        try:
-            with open(CSV_PATH, 'r', encoding='utf-8', errors='ignore') as f:
-                raw_data = list(csv.DictReader(f))
-                print(f"Loaded {len(raw_data)} recipes from {CSV_PATH}.")
-        except Exception as e:
-            print(f"CSV load error: {e}")
 
     if not raw_data:
         raise RuntimeError("No recipe data available to load!")
