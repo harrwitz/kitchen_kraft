@@ -1,4 +1,4 @@
-live demo: [https://ai-recipe-generator-2cybt6foz-harrwitzs-projects.vercel.app](https://ai-recipe-generator-2cybt6foz-harrwitzs-projects.vercel.app)
+live demo: [[https://ai-recipe-generator-2cybt6foz-harrwitzs-projects.vercel.app](https://ai-recipe-generator-2cybt6foz-harrwitzs-projects.vercel.app)](https://ai-recipe-generator-harrwitz-harrwitzs-projects.vercel.app/)
 # AI Recipe Builder 🥗
 
 A production-quality, high-performance **AI Recipe Builder & Search Engine** web application built with **FastAPI, Pandas, Scikit-Learn (TF-IDF + Cosine Similarity), React 18, Vite, and Tailwind CSS**.
