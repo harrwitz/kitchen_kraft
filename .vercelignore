@@ -1,9 +1,9 @@
 # Vercel Ignore Rules to optimize serverless function bundle size
 backend/Food Ingredients and Recipe Dataset with Image Name Mapping.csv
-backend/recipes.csv
 backend/recipes_compact.json
-api/recipes.csv
 api/recipes_compact.json
+backend/recipes.db
+api/recipes.db
 *.pkl
 *.pyc
 __pycache__/

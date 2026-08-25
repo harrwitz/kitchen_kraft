@@ -34,55 +34,32 @@ state = AppState()
 def ensure_state_loaded():
     """
     Fast, lightweight, zero-heavy-dependency state loader.
-    Prioritizes reading from local SQLite database (recipes.db).
+    Prioritizes reading from CSV dataset files (recipes.csv), with GZ/SQLite fallbacks.
     """
     if state.is_loaded:
         return
 
-    print("Initializing AI Recipe Builder Backend (SQLite Engine)...")
+    print("Initializing AI Recipe Builder Backend...")
 
     raw_data = []
 
-    # 1. Try reading from SQLite database (recipes.db)
-    candidate_db_paths = [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes.db")),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes.db")),
-        os.path.join(os.getcwd(), "api", "recipes.db"),
-        os.path.join(os.getcwd(), "backend", "recipes.db"),
+    # 1. Try reading recipes.csv (CSV dataset)
+    candidate_csv_paths = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes.csv")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes.csv")),
+        os.path.join(os.getcwd(), "api", "recipes.csv"),
+        os.path.join(os.getcwd(), "backend", "recipes.csv"),
+        os.path.join(os.getcwd(), "recipes.csv"),
     ]
-
-    for db_path in candidate_db_paths:
-        if os.path.exists(db_path):
+    for csv_path in candidate_csv_paths:
+        if os.path.exists(csv_path):
             try:
-                conn = sqlite3.connect(db_path)
-                conn.row_factory = sqlite3.Row
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM recipes ORDER BY id ASC")
-                db_rows = cursor.fetchall()
-                raw_data = [dict(r) for r in db_rows]
-                conn.close()
-                print(f"Loaded {len(raw_data)} recipes from SQLite database at {db_path}.")
-                break
+                with open(csv_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    raw_data = list(csv.DictReader(f))
+                    print(f"Loaded {len(raw_data)} recipes from CSV at {csv_path}.")
+                    break
             except Exception as e:
-                print(f"SQLite load error for {db_path}: {e}")
-
-    # 2. Try reading recipes.csv as fallback
-    if not raw_data:
-        candidate_csv_paths = [
-            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes.csv")),
-            os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes.csv")),
-            os.path.join(os.getcwd(), "api", "recipes.csv"),
-            os.path.join(os.getcwd(), "backend", "recipes.csv"),
-        ]
-        for csv_path in candidate_csv_paths:
-            if os.path.exists(csv_path):
-                try:
-                    with open(csv_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        raw_data = list(csv.DictReader(f))
-                        print(f"Loaded {len(raw_data)} recipes from CSV at {csv_path}.")
-                        break
-                except Exception as e:
-                    print(f"CSV load error for {csv_path}: {e}")
+                print(f"CSV load error for {csv_path}: {e}")
 
     # 2. Try compressed JSON.GZ file fallback
     if not raw_data:
@@ -91,6 +68,7 @@ def ensure_state_loaded():
             os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes_compact.json.gz")),
             os.path.join(os.getcwd(), "api", "recipes_compact.json.gz"),
             os.path.join(os.getcwd(), "backend", "recipes_compact.json.gz"),
+            os.path.join(os.getcwd(), "recipes_compact.json.gz"),
         ]
         for gz_path in candidate_gz_paths:
             if os.path.exists(gz_path):
@@ -103,7 +81,30 @@ def ensure_state_loaded():
                 except Exception as e:
                     print(f"GZ load error for {gz_path}: {e}")
 
-    # 3. Try JSON file fallback
+    # 3. Try reading from SQLite database (recipes.db)
+    if not raw_data:
+        candidate_db_paths = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes.db")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "recipes.db")),
+            os.path.join(os.getcwd(), "api", "recipes.db"),
+            os.path.join(os.getcwd(), "backend", "recipes.db"),
+        ]
+        for db_path in candidate_db_paths:
+            if os.path.exists(db_path):
+                try:
+                    conn = sqlite3.connect(db_path)
+                    conn.row_factory = sqlite3.Row
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT * FROM recipes ORDER BY id ASC")
+                    db_rows = cursor.fetchall()
+                    raw_data = [dict(r) for r in db_rows]
+                    conn.close()
+                    print(f"Loaded {len(raw_data)} recipes from SQLite database at {db_path}.")
+                    break
+                except Exception as e:
+                    print(f"SQLite load error for {db_path}: {e}")
+
+    # 4. Try JSON file fallback
     if not raw_data:
         candidate_json_paths = [
             os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "recipes_compact.json")),
